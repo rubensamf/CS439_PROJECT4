@@ -10,6 +10,10 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
+// MULTILEVEL FILE - RDS
+#define INDIRECT_SIZE 64
+#define DIRECT_SIZE 256
+
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
@@ -17,7 +21,8 @@ struct inode_disk
     block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+	uint32_t* indir_ptr[64];			/* Indirect Pointer */
+    uint32_t unused[61];                /* Not used. */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -84,9 +89,14 @@ inode_create (block_sector_t sector, off_t length)
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
     {
-      size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+
+	  size_t n;
+	  for(n = 0; n < INDIRECT_SIZE; ++n)
+		  disk_inode->indir_ptr[n] = calloc(DIRECT_SIZE, sizeof(uint32_t*));
+
+      size_t sectors = bytes_to_sectors (length);
       if (free_map_allocate (sectors, &disk_inode->start)) 
         {
           block_write (fs_device, sector, disk_inode);
