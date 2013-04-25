@@ -21,11 +21,12 @@ void inode_release(block_sector_t ptr);
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
 {
-	off_t pos;							/* Current Position in Double Indirect Pointer */ 
+	off_t pos;		            /* Current Position in Double Indirect Pointer */ 
 	off_t length;                       /* File size in bytes. */
+        block_sector_t ptr;	            /* Double Indirect Pointer */
+        bool is_directory;                  /* Directory Flag */
 	unsigned magic;                     /* Magic number. */
-	block_sector_t ptr;					/* Double Indirect Pointer */
-	uint32_t unused[124];               /* Not used. */
+	uint32_t unused[123];               /* Not used. */
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -358,6 +359,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 		size -= chunk_size;
 		offset += chunk_size;
 		bytes_read += chunk_size;
+                
 	}
 	free (bounce);
 
