@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "userprog/fdt.h"
+#include "filesys/directory.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -110,6 +111,8 @@ struct thread
     struct list child_list;
 	struct list wait_list;
 	struct file* file;
+    
+    struct dir cwd;                     /* Current working directory */      
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
