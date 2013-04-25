@@ -107,12 +107,12 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
 
     // ------------ System Call ------------
-	int numchild;
+    int numchild;
     struct list child_list;
-	struct list wait_list;
-	struct file* file;
+    struct list wait_list;
+    struct file* file;
     
-    struct dir cwd;                     /* Current working directory */      
+    struct dir* cwd;                     /* Current working directory */      
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
