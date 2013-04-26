@@ -55,6 +55,33 @@
         <in>shell.c</in>
       </df>
       <df name="filesys">
+        <df name="build">
+          <df name="devices">
+          </df>
+          <df name="filesys">
+          </df>
+          <df name="lib">
+            <df name="kernel">
+            </df>
+            <df name="user">
+            </df>
+          </df>
+          <df name="tests">
+            <df name="filesys">
+              <df name="base">
+              </df>
+              <df name="extended">
+              </df>
+            </df>
+            <df name="userprog">
+            </df>
+          </df>
+          <df name="threads">
+            <in>kernel.lds.s</in>
+          </df>
+          <df name="userprog">
+          </df>
+        </df>
         <in>directory.c</in>
         <in>directory.h</in>
         <in>file.c</in>
