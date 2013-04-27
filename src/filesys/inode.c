@@ -139,7 +139,7 @@ inode_create (block_sector_t sector, off_t length)
 		memset (dli, INODE_ERROR, MLSIZE * sizeof(block_sector_t));
 		memset (sli, INODE_ERROR, MLSIZE * sizeof(block_sector_t));
 
-		bool result = inode_allocate(disk_inode, 0, dli, sli);
+		bool result = inode_allocate(disk_inode, length, dli, sli);
 
 		if(!result)
 		{
@@ -441,7 +441,7 @@ bool inode_extend(struct inode *inode, off_t size)
 	block_read(fs_device, disk_inode.ptr, dli);
 	block_read(fs_device, dli[dli_pos], sli);
 
-	bool result = inode_allocate(&disk_inode, size, dli, sli);
+	bool result = inode_allocate(&disk_inode, length + size, dli, sli);
 	free (sli);
 	free (dli);
 
@@ -453,14 +453,13 @@ bool inode_extend(struct inode *inode, off_t size)
 
 bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* dli, block_sector_t* sli)
 {
-	off_t length = disk_inode->length;
 	size_t sectors;
-	for(sectors = bytes_to_sectors (length + size); sectors > 0; --sectors)
+	for(sectors = bytes_to_sectors (size); sectors > 0; --sectors)
 	{
 		static char zeros[BLOCK_SECTOR_SIZE];
-		if (free_map_allocate (1, &sli[disk_inode->pos])) 
+		if (free_map_allocate (1, &sli[disk_inode->pos % MLSIZE])) 
 		{
-			block_write (fs_device, sli[disk_inode->pos], zeros);
+			block_write (fs_device, sli[disk_inode->pos % MLSIZE], zeros);
 		}
 		else
 		{	
@@ -470,7 +469,7 @@ bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* d
 		++disk_inode->pos;
 		if(disk_inode->pos % MLSIZE == 0)
 		{
-			off_t dli_pos = disk_inode->pos / MLSIZE;
+			off_t dli_pos = disk_inode->pos / MLSIZE - 1;
 			bool add = free_map_allocate (1, &dli[dli_pos]);
 			if(add)
 			{
