@@ -17,6 +17,7 @@
 #define INODE_ERROR SIZE_MAX
 
 void inode_release(block_sector_t ptr);
+bool inode_extend(struct inode *inode, off_t offset);
 
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
@@ -404,6 +405,10 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	{
 		/* Sector to write, starting byte offset within sector. */
 		block_sector_t sector_idx = byte_to_sector (inode, offset);
+                if(sector_idx == NULL && !inode_extend(inode, offset))
+                    return false;
+                
+                sector_idx = byte_to_sector (inode, offset);              
 		int sector_ofs = offset % BLOCK_SECTOR_SIZE;
 
 		/* Bytes left in inode, bytes left in sector, lesser of the two. */
@@ -451,6 +456,84 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	return bytes_written;
 }
 
+bool
+inode_extend(struct inode *inode, off_t offset)
+{
+    struct inode_disk disk_inode = inode->data;
+    
+    off_t inode_len = inode_length (inode);
+    off_t last_sector = inode_len / BLOCK_SECTOR_SIZE;
+    off_t dli_pos = last_sector / MLSIZE;
+    off_t sli_pos = last_sector % MLSIZE;
+
+    block_sector_t* dli = malloc(MLSIZE * sizeof(block_sector_t));
+    if(dli == NULL)
+            return -1;
+
+    block_sector_t* sli = malloc(MLSIZE * sizeof(block_sector_t));
+    if(sli == NULL)
+            return -1;
+
+    block_read(fs_device, &disk_inode, dli);
+    block_read(fs_device, dli[dli_pos], sli);
+    return sli[sli_pos];
+    
+    size_t sectors;
+    for(sectors = bytes_to_sectors (inode_len + offset); sectors > 0; --sectors)
+    {
+                static char zeros[BLOCK_SECTOR_SIZE];
+                if (free_map_allocate (1, &sli[disk_inode.pos])) 
+                {
+                        block_write (fs_device, sli[disk_inode.pos], zeros);
+                }
+                else
+                {	
+                        free (dli);
+                        free (sli);
+                        return false;
+                }
+
+                ++disk_inode.pos;
+                if(disk_inode.pos % MLSIZE == 0)
+                {
+                        off_t dli_pos = disk_inode.pos / MLSIZE;
+                        bool add = free_map_allocate (1, &dli[dli_pos]);
+                        if(add)
+                        {
+                                block_write (fs_device, dli[dli_pos], sli);	
+                                memset (sli, INODE_ERROR, MLSIZE * sizeof(block_sector_t));
+                        }
+                        else
+                        {
+                                inode_release (disk_inode.ptr);
+                                free (dli);
+                                return false;
+                        }
+                }
+        }
+
+        if(disk_inode.pos % MLSIZE != 0)
+        {
+                off_t dli_pos = disk_inode.pos / MLSIZE;
+                bool add = free_map_allocate (1, &dli[dli_pos]);
+                if(add)
+                {
+                        block_write (fs_device, dli[dli_pos], sli);	
+                }
+                else
+                {
+                        inode_release (disk_inode.ptr);
+                        free (dli);
+                        return false;
+                }
+        }
+
+        free (sli);
+        free (dli);
+
+	return true;
+}
+        
 /* Disables writes to INODE.
    May be called at most once per inode opener. */
 	void
