@@ -65,6 +65,9 @@ byte_to_sector (const struct inode *inode, off_t pos)
 		off_t sector = pos / BLOCK_SECTOR_SIZE;
 		off_t dli_pos = sector / MLSIZE;
 		off_t sli_pos = sector % MLSIZE;
+		//printf("pos: %u\n", pos);
+		//printf("dli_pos: %u\n", dli_pos);
+		//printf("sli_pos: %u\n", sli_pos);
 
 		block_sector_t* dli = malloc(MLSIZE * sizeof(block_sector_t));
 		if(dli == NULL)
@@ -157,7 +160,6 @@ inode_create (block_sector_t sector, off_t length)
 		}
 		else
 		{
-			block_write (fs_device, disk_inode->ptr, dli);
 			block_write (fs_device, sector, disk_inode);
 			free (sli);
 			free (dli);
@@ -232,6 +234,8 @@ inode_close (struct inode *inode)
 	/* Release resources if this was the last opener. */
 	if (--inode->open_cnt == 0)
 	{
+		block_write (fs_device, inode->sector, &inode->data);
+
 		/* Remove from inode list and release lock. */
 		list_remove (&inode->elem);
 
@@ -377,13 +381,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 		//printf("offset: %d sector_idx: %d\n", offset, sector_idx);
 		if(sector_idx == INODE_ERROR)
 		{
-			if(!inode_extend(inode, offset + size))
+			if(!inode_extend(inode, offset - inode_length(inode) + size))
 				return false;
 			else
 				sector_idx = byte_to_sector (inode, offset);              
 		}
-
 		int sector_ofs = offset % BLOCK_SECTOR_SIZE;
+		//printf("offset: %d sector_idx: %d\n", offset, sector_idx);
 
 		/* Bytes left in inode, bytes left in sector, lesser of the two. */
 		off_t inode_left = inode_length (inode) - offset;
@@ -432,10 +436,16 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
 bool inode_extend(struct inode *inode, off_t size)
 {
-	struct inode_disk disk_inode = inode->data;
+	struct inode_disk* disk_inode = &inode->data;
 	off_t length = inode_length (inode);
 	off_t last_sector = length / BLOCK_SECTOR_SIZE;
 	off_t dli_pos = last_sector / MLSIZE;
+
+	//printf("INODE EXTEND\n");
+	//printf("length: %u\n", length);
+	//printf("size: %u\n", size);
+	//printf("disk_inode.ptr: %u\n", disk_inode.ptr);
+	//printf("dli_pos: %u\n", dli_pos);
 
 	block_sector_t* dli = malloc(MLSIZE * sizeof(block_sector_t));
 	if(dli == NULL)
@@ -445,17 +455,26 @@ bool inode_extend(struct inode *inode, off_t size)
 	if(sli == NULL)
 		return false;
 
-	block_read(fs_device, disk_inode.ptr, dli);
-	block_read(fs_device, dli[dli_pos], sli);
+	block_read(fs_device, disk_inode->ptr, dli);
+	if(length != 0)
+		block_read(fs_device, dli[dli_pos], sli);
+	else
+		memset (sli, INODE_ERROR, MLSIZE * sizeof(block_sector_t));
 
-	bool result = inode_allocate(&disk_inode, length + size, dli, sli);
+	bool result = inode_allocate(disk_inode, length + size, dli, sli);
 	free (sli);
 	free (dli);
 
 	if(!result)
+	{
 		return false;
+	}
 	else
+	{
+		inode->data.length += size;
+		block_write (fs_device, inode->sector, disk_inode);
 		return true;
+	}
 }
 
 bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* dli, block_sector_t* sli)
@@ -503,6 +522,7 @@ bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* d
 			return false;
 		}
 	}
+	block_write (fs_device, disk_inode->ptr, dli);
 	return true;
 }
 
