@@ -57,6 +57,7 @@ static void sysremove(struct intr_frame* frame, const char* file);
 static void sysseek(int fd, unsigned position);
 static void systell(struct intr_frame *frame, int fd);
 static void syswrite(struct intr_frame *frame, int fd, const void *buffer, unsigned size);
+
 /*Project 4 System Calls*/
 static void syschdir(struct intr_frame *frame, const char *dir);
 static void sysmkdir(struct intr_frame *frame, const char *dir);
@@ -67,24 +68,21 @@ static void sysinumber(struct intr_frame *frame, int fd);
 
 /* Determine whether user process pointer is valid;
    Otherwise, return false*/ 
-static bool
+	static bool
 check_uptr (const void* uptr)
 {
 	if(uptr != NULL)
 	{
 		if(is_user_vaddr(uptr))
 		{
-			void* kptr = pagedir_get_page(thread_current()->pagedir, uptr);
-			if(kptr != NULL)
-			{
-				return true;
-			}
+			pagedir_get_page(thread_current()->pagedir, uptr);
+			return true;
 		}
 	} 
 	return false;
 }
 
-static bool
+	static bool
 check_buffer (const char* uptr, unsigned length)
 {
 	unsigned i;
@@ -97,7 +95,7 @@ check_buffer (const char* uptr, unsigned length)
 	return true;
 }
 
-void
+	void
 syscall_init (void) 
 {
 	list_init (&ignore_list);
@@ -112,7 +110,7 @@ syscall_init (void)
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-static void
+	static void
 syscall_handler (struct intr_frame* frame) 
 {
 	// -------- System Call Handler Overview -------- 
@@ -165,7 +163,7 @@ syscall_handler (struct intr_frame* frame)
 					childid = next_value(&kpaddr_sp);
 				else
 					sysexit(childid);
-			
+
 				int retval = process_wait((tid_t) childid);
 				frame->eax = retval;
 			}
@@ -191,7 +189,7 @@ syscall_handler (struct intr_frame* frame)
 			break;
 		case SYS_REMOVE:	
 			{
-                                //bool remove (const char *file);
+				//bool remove (const char *file);
 				const char* file =  next_charptr(&kpaddr_sp);
 				if(file == NULL)
 					sysexit(-1);
@@ -214,19 +212,19 @@ syscall_handler (struct intr_frame* frame)
 				if(!check_buffer(file, len))
 					sysexit(-1);
 
-	      		        sysopen(frame, file);
+				sysopen(frame, file);
 			}
 			break;
 		case SYS_FILESIZE:     
 			{
 				//int filesize (int fd);
-	      		        int fd = 0;
-	      		        if (check_uptr(kpaddr_sp))
+				int fd = 0;
+				if (check_uptr(kpaddr_sp))
 					fd = (int) next_value(&kpaddr_sp);
-	      		        else
+				else
 					sysexit(-1);
 
-	      		        sysfilesize(frame, fd);
+				sysfilesize(frame, fd);
 			}
 			break;
 		case SYS_READ:        
@@ -343,47 +341,47 @@ syscall_handler (struct intr_frame* frame)
 				sysclose(fd);
 			}
 			break;
-                case SYS_CHDIR:          
-                        {
-                               //bool chdir (const char *dir) 
+		case SYS_CHDIR:          
+			{
+				//bool chdir (const char *dir) 
 
-                        }
-                        break;        
-                case SYS_MKDIR:   
-                        {
-                               //bool mkdir (const char *dir) 
-                        }
-                        break;                  
-                case SYS_READDIR:
-                        {
-                               //bool readdir (int fd, char *name) 
+			}
+			break;        
+		case SYS_MKDIR:   
+			{
+				//bool mkdir (const char *dir) 
+			}
+			break;                  
+		case SYS_READDIR:
+			{
+				//bool readdir (int fd, char *name) 
 
-                        }
-                        break;                
-                case SYS_ISDIR:        
-                        {
-                               //bool isdir (int fd) 
-			       int fd = 0;
-			       if (check_uptr(kpaddr_sp))
+			}
+			break;                
+		case SYS_ISDIR:        
+			{
+				//bool isdir (int fd) 
+				int fd = 0;
+				if (check_uptr(kpaddr_sp))
 					fd = (int) next_value(&kpaddr_sp);
 				else
 					sysexit(-1);
 
 				sysisdir(frame, fd);
-                        }
-                        break;          
-                case SYS_INUMBER:        
-                        {
-                               //int inumber (int fd) 
-                                int fd = 0;
+			}
+			break;          
+		case SYS_INUMBER:        
+			{
+				//int inumber (int fd) 
+				int fd = 0;
 				if (check_uptr(kpaddr_sp))
 					fd = (int) next_value(&kpaddr_sp);
 				else
 					sysexit(-1);
 
 				sysinumber(frame, fd);
-                        }
-                        break;                     
+			}
+			break;                     
 		default:
 			{
 				printf("Unrecognized System Call\n");
@@ -393,7 +391,7 @@ syscall_handler (struct intr_frame* frame)
 	}
 }
 
-static uintptr_t
+	static uintptr_t
 next_value(uintptr_t** sp)
 {
 	uintptr_t* ptr = *sp;
@@ -404,7 +402,7 @@ next_value(uintptr_t** sp)
 }
 
 
-static void*
+	static void*
 next_ptr(uintptr_t** sp)
 {
 	void* voidptr = (void*) next_value(sp);
@@ -414,13 +412,13 @@ next_ptr(uintptr_t** sp)
 		return NULL;
 }
 
-static char*
+	static char*
 next_charptr(uintptr_t** sp)
 {
 	return (char *) next_ptr(sp);
 }
 
-void
+	void
 sysexit(int status)
 {
 	// Print Process Termination Message
@@ -479,7 +477,7 @@ sysexit(int status)
 	thread_exit();
 }
 
-static void
+	static void
 sysclose(int fd)
 {
 	struct file *file = fd_remove(fd);
@@ -489,7 +487,7 @@ sysclose(int fd)
 		sysexit(-1);
 }
 
-static void
+	static void
 syscreate(struct intr_frame* frame, const char* file, unsigned size)
 {
 	lock_acquire(&filecreate_lock);
@@ -498,7 +496,7 @@ syscreate(struct intr_frame* frame, const char* file, unsigned size)
 	lock_release(&filecreate_lock);
 }
 
-static void
+	static void
 sysexec(struct intr_frame* frame, const char* file)
 {
 	lock_acquire(&exec_lock);
@@ -520,7 +518,7 @@ sysexec(struct intr_frame* frame, const char* file)
 	lock_release(&exec_lock);
 }
 
-static void
+	static void
 sysfilesize(struct intr_frame *frame, int fd)
 {
 	struct file *file = fd_get_file(fd);
@@ -535,7 +533,7 @@ sysfilesize(struct intr_frame *frame, int fd)
 	}
 }
 
-static void
+	static void
 sysopen(struct intr_frame *frame, const char *file)
 {
 	struct file *f = filesys_open(file);
@@ -550,7 +548,7 @@ sysopen(struct intr_frame *frame, const char *file)
 	}
 }
 
-static void
+	static void
 sysread(struct intr_frame *frame, int fd, void *buffer, unsigned size)
 {
 	// special case
@@ -578,14 +576,14 @@ sysread(struct intr_frame *frame, int fd, void *buffer, unsigned size)
 	}
 }
 
-static void 
+	static void 
 sysremove(struct intr_frame* frame, const char* file)
 {
 	bool result = filesys_remove(file);
 	frame->eax = result;
 }
 
-static void
+	static void
 sysseek(int fd, unsigned position)
 {
 	struct file *file = fd_get_file(fd);
@@ -596,7 +594,7 @@ sysseek(int fd, unsigned position)
 		file_seek(file, position);
 }
 
-static void
+	static void
 systell(struct intr_frame *frame, int fd)
 {
 	struct file *file = fd_get_file(fd);
@@ -611,7 +609,7 @@ systell(struct intr_frame *frame, int fd)
 	}
 }
 
-static void
+	static void
 syswrite(struct intr_frame *frame, int fd, const void *buffer, unsigned size)
 {
 	struct file *file = fd_get_file(fd);
@@ -626,30 +624,35 @@ syswrite(struct intr_frame *frame, int fd, const void *buffer, unsigned size)
 	}
 }
 
-static void 
+	static void 
 syschdir(struct intr_frame *frame UNUSED, const char *dir UNUSED)
 {
-    return;
+	// TODO
+	return;
 }
-static void 
+	static void 
 sysmkdir(struct intr_frame *frame UNUSED, const char *dir UNUSED)
 {
-    return;    
+	// TODO
+	return;    
 }
-static void 
+	static void 
 sysreaddir(struct intr_frame *frame UNUSED, int fd UNUSED, char *name UNUSED)
 {
-    return;    
+	// TODO
+	return;    
 }
-static void 
+	static void 
 sysisdir(struct intr_frame *frame UNUSED, int fd UNUSED)
 {
-    return;
+	// TODO
+	return;
 }
-static void 
+	static void 
 sysinumber(struct intr_frame *frame UNUSED, int fd UNUSED)
 {
-    return;
+	// TODO
+	return;
 }
 
 
@@ -686,7 +689,7 @@ bool ignore_remove(tid_t id)
 	return false;
 }
 
-void 
+	void 
 exit_foreach(exit_action_func * func, void* aux)
 {
 	struct list_elem * e;

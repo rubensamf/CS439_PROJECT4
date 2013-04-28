@@ -34,7 +34,7 @@ int fd_create(struct file *file)
 		}
   }
 
-  return -1; // no room
+  return -1; // completely filled array
 }
 
 /* Returns the file associated with the given descriptor */
@@ -81,5 +81,5 @@ void fdt_destroy(fdt_t fdt)
    making a slight assumption that NULL is indeed 0. */
 fdt_t fdt_init()
 {
-  	return (fdt_t) calloc(FDT_MAX_FILES, sizeof(struct file *));
+	return (fdt_t) calloc(FDT_MAX_FILES, sizeof(struct file *));
 }

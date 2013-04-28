@@ -9,6 +9,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/fdt.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -19,7 +20,9 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "userprog/fdt.h"
+#include "threads/synch.h"
+#include "vm/spage.h"
+#include "lib/kernel/bitmap.h"
 
 #define MAX_NAME_LEN 32
 #define MAX_NUM_BYTES 4080
@@ -28,6 +31,8 @@
 struct semaphore exec_load_sema;
 struct list waitproc_list;
 bool exec_load_status;
+uint8_t * stack_bound;
+struct lock fevict;
 
 // Additional Function Prototypes
 static int count_bytes(char **str_ptr);
@@ -46,7 +51,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
-tid_t
+	tid_t
 process_execute (const char *file_name) 
 {
 	char *fn_copy;
@@ -69,7 +74,7 @@ process_execute (const char *file_name)
 }
 
 /* A thread function that loads a user process and starts it running. */
-static void
+	static void
 start_process (void *file_name_)
 {
 	char *file_name = file_name_;
@@ -111,7 +116,7 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
-int
+	int
 process_wait (tid_t child_tid) 
 {
 	int retval = -1;
@@ -139,7 +144,6 @@ process_wait (tid_t child_tid)
 				{
 					sema_down(&wp->sema);
 				}
-				//printf("RELEASED %d : %d\n", thread_current()->tid, child_tid);
 			}
 			list_remove(&wp->elem);
 			free(wp);
@@ -152,7 +156,7 @@ process_wait (tid_t child_tid)
 }
 
 /* Free the current process's resources. */
-void
+	void
 process_exit (void)
 {
 	struct thread *cur = thread_current ();
@@ -189,6 +193,9 @@ process_exit (void)
 		pagedir_activate (NULL);
 		pagedir_destroy (pd);
 	}
+
+	if(lock_held_by_current_thread (&fevict))
+		lock_release(&fevict);
 }
 
 /* Sets up the CPU for running user code in the current thread.
@@ -328,6 +335,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
 		goto done; 
 	}
 
+	hash_init (&t->spagedir, spage_hash_hash_func, spage_hash_less_func, NULL);
+
 	/* Read program headers. */
 	file_ofs = ehdr.e_phoff;
 	for (i = 0; i < ehdr.e_phnum; i++) 
@@ -409,7 +418,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 	/* Start address. */
 	*eip = (void (*) (void)) ehdr.e_entry;
-
 	success = true;
 
 done:
@@ -429,10 +437,6 @@ done:
 	}
 	return success;
 }
-
-/* load() helpers. */
-
-static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -510,30 +514,37 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-		/* Get a page of memory. */
-		uint8_t *kpage = palloc_get_page (PAL_USER);
-		if (kpage == NULL)
+		struct spage * p = (struct spage *) malloc(sizeof(struct spage));
+		if(p == NULL)
 			return false;
 
-		/* Load this page. */
-		if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+		p->addr = upage;
+		if(page_read_bytes == PGSIZE) // FILE
 		{
-			palloc_free_page (kpage);
-			return false; 
+			p->state = DISK;
 		}
-		memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-		/* Add the page to the process's address space. */
-		if (!install_page (upage, kpage, writable)) 
+		else if(page_zero_bytes == PGSIZE) // ZERO
 		{
-			palloc_free_page (kpage);
-			return false; 
+			p->state = ZERO;
 		}
+		else // SWAP
+		{
+			p->state = MIXED;
+		}
+		p->file = file;
+		p->ofs = ofs;
+		p->readonly = writable;
+		p->page_read_bytes = page_read_bytes;
+		p->page_zero_bytes = page_zero_bytes;
+		p->swapindex = BITMAP_ERROR;
+        lock_init(&p->spagelock);
+		hash_insert (&thread_current()->spagedir, &p->hash_elem);
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+		ofs += PGSIZE;
 	}
 	return true;
 }
@@ -546,15 +557,36 @@ setup_stack (void **esp)
 	uint8_t *kpage;
 	bool success = false;
 
-	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+	kpage = frame_selector (((uint8_t *) PHYS_BASE) - PGSIZE, PAL_USER | PAL_ZERO);
 	if (kpage != NULL) 
 	{
+		stack_bound = ((uint8_t *) PHYS_BASE) - PGSIZE;
 		success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
 		if (success)
+		{
 			*esp = PHYS_BASE;
+			// Add stack page to supplementary page table - rds
+			struct spage * p = (struct spage *) malloc(sizeof(struct spage));
+			if(p != NULL)
+			{
+				p->addr = ((uint8_t *) PHYS_BASE) - PGSIZE;
+				p->state = ZERO;
+				p->file = NULL;
+				p->ofs = 0;
+				p->readonly = true;
+				p->page_read_bytes = 0;
+				p->page_zero_bytes = PGSIZE;
+				p->swapindex = BITMAP_ERROR;
+            	lock_init(&p->spagelock);
+				hash_insert (&thread_current()->spagedir, &p->hash_elem);
+			}
+		}
 		else
+		{
 			palloc_free_page (kpage);
-	}
+		}
+	} 
+
 	return success;
 }
 
@@ -567,7 +599,7 @@ setup_stack (void **esp)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-	static bool
+	bool
 install_page (void *upage, void *kpage, bool writable)
 {
 	struct thread *t = thread_current ();

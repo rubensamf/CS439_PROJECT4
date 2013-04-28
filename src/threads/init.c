@@ -41,6 +41,9 @@
 /* Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
 
+/* Swap Table RDS */
+struct swap_t *swaptable;
+
 #ifdef FILESYS
 /* -f: Format the file system? */
 static bool format_filesys;
@@ -127,6 +130,7 @@ main (void)
   filesys_init (format_filesys);
 #endif
 
+  swaptable = swap_init();
   printf ("Boot complete.\n");
   
   /* Run actions specified on kernel command line. */

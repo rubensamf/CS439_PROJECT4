@@ -5,7 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "userprog/fdt.h"
-#include "filesys/directory.h"
+#include "lib/kernel/hash.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -106,13 +106,11 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
-    // ------------ System Call ------------
-    int numchild;
-    struct list child_list;
-    struct list wait_list;
-    struct file* file;
-    
-    struct dir* cwd;                     /* Current working directory */      
+   // ------------ System Call ------------
+   int numchild;
+   struct list child_list;
+   struct list wait_list;
+   struct file* file;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -120,6 +118,7 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct hash spagedir;				/* Supplementary Page Directory */
     fdt_t fdt;                          /* File Descriptor Table */
 #endif
 
