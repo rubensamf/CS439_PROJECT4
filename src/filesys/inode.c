@@ -72,11 +72,17 @@ byte_to_sector (const struct inode *inode, off_t pos)
 
 		block_sector_t* sli = malloc(MLSIZE * sizeof(block_sector_t));
 		if(sli == NULL)
+		{
+			free(sli);
 			return INODE_ERROR;
+		}
 
 		block_read(fs_device, inode->data.ptr, dli);
 		block_read(fs_device, dli[dli_pos], sli);
-		return sli[sli_pos];
+		block_sector_t block_idx = sli[sli_pos];
+		free(dli);
+		free(sli);
+		return block_idx;
 	}
 	else
 	{
@@ -300,12 +306,12 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 	uint8_t *bounce = NULL;
 
 	//printf("---------INODE READ: %d:%d---------\n", inode->data.ptr, size);
-	//debug_backtrace();
 	while (size > 0) 
 	{
 		/* Disk sector to read, starting byte offset within sector. */
 		block_sector_t sector_idx = byte_to_sector (inode, offset);
 		int sector_ofs = offset % BLOCK_SECTOR_SIZE;
+		//printf("offset: %d sector_idx: %d\n", offset, sector_idx);
 
 		/* Bytes left in inode, bytes left in sector, lesser of the two. */
 		off_t inode_left = inode_length (inode) - offset;
@@ -368,6 +374,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	{
 		/* Sector to write, starting byte offset within sector. */
 		block_sector_t sector_idx = byte_to_sector (inode, offset);
+		//printf("offset: %d sector_idx: %d\n", offset, sector_idx);
 		if(sector_idx == INODE_ERROR)
 		{
 			if(!inode_extend(inode, offset + size))

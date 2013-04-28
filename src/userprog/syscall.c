@@ -45,7 +45,6 @@ static void* next_ptr(uintptr_t** sp);
 // Locks
 static struct lock exec_lock;
 static struct lock filecreate_lock;
-static struct lock fileremove_lock;
 
 // Syscall Functions
 static void sysclose(int fd);
@@ -109,7 +108,6 @@ syscall_init (void)
 	sema_init(&exec_load_sema, 0);
 	lock_init(&exec_lock);
 	lock_init(&filecreate_lock);
-	lock_init(&fileremove_lock);
 
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -583,10 +581,8 @@ sysread(struct intr_frame *frame, int fd, void *buffer, unsigned size)
 static void 
 sysremove(struct intr_frame* frame, const char* file)
 {
-	lock_acquire(&fileremove_lock);
 	bool result = filesys_remove(file);
 	frame->eax = result;
-	lock_release(&fileremove_lock);
 }
 
 static void
