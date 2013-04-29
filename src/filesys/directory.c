@@ -21,12 +21,16 @@ struct dir_entry
     bool in_use;                        /* In use or free? */
   };
 
+  
+bool inode_create_dir (block_sector_t sector, size_t length);
+
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+    return inode_create_dir (sector, entry_cnt * sizeof (struct dir_entry));
+  //return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
 }
 
 /* Opens and returns the directory for the given INODE, of which
