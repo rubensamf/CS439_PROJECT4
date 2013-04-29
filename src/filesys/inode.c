@@ -375,7 +375,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	if (inode->deny_write_cnt)
 		return 0;
 
-	//printf("--------------INODE WRITE: %d:%d:%d--------------\n", inode->data.size, offset, size);
 	//debug_backtrace();
 	while (size > 0) 
 	{
@@ -383,6 +382,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 		block_sector_t sector_idx = byte_to_sector (inode, offset);
 		if(sector_idx == INODE_ERROR)
 		{
+			//printf("--------------INODE WRITE: %d:%d:%d--------------\n", inode->data.size, offset, size);
 			if(!inode_extend(inode, offset - inode_length(inode) + size))
 				return false;
 			else
@@ -450,7 +450,17 @@ bool inode_extend(struct inode *inode, off_t size)
 	//printf("INODE EXTEND\n");
 	//printf("length: %u\n", length);
 	//printf("size: %u\n", size);
-	//printf("disk_inode->ptr: %u\n", disk_inode->ptr);
+
+	off_t open_space = disk_inode->size - disk_inode->length;
+	if(open_space >= size)
+	{
+		disk_inode->length += size;
+	}
+	else
+	{
+		disk_inode->length += open_space;
+		size -= open_space;
+	}
 
 	block_sector_t* dli = malloc(MLSIZE * sizeof(block_sector_t));
 	if(dli == NULL)
@@ -476,7 +486,6 @@ bool inode_extend(struct inode *inode, off_t size)
 	}
 	else
 	{
-		//inode->data.length += size;
 		block_write (fs_device, inode->sector, disk_inode);
 		return true;
 	}
