@@ -452,13 +452,8 @@ bool inode_extend(struct inode *inode, off_t size)
 	//printf("size: %u\n", size);
 
 	off_t open_space = disk_inode->size - disk_inode->length;
-	if(open_space >= size)
+	if(open_space < size)
 	{
-		disk_inode->length += size;
-	}
-	else
-	{
-		disk_inode->length += open_space;
 		size -= open_space;
 	}
 
