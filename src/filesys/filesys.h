@@ -3,6 +3,17 @@
 
 #include <stdbool.h>
 #include "filesys/off_t.h"
+#include "lib/kernel/list.h"
+#include "filesys/inode.h"
+
+#define DIRSIZE 16
+
+struct path
+{
+	char* path;
+	struct list_elem elem;
+};
+
 
 /* Sectors of system file inodes. */
 #define FREE_MAP_SECTOR 0       /* Free map file inode sector. */
@@ -16,5 +27,8 @@ void filesys_done (void);
 bool filesys_create (const char *name, off_t initial_size);
 struct file *filesys_open (const char *name);
 bool filesys_remove (const char *name);
+struct dir * navigate_filesys(struct list* path, char* filepath);
+struct list* parse_filepath(char* filepath);
+void delete_list(struct list* list);
 
 #endif /* filesys/filesys.h */

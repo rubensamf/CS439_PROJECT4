@@ -6,13 +6,6 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 
-/* A directory. */
-struct dir 
-  {
-    struct inode *inode;                /* Backing store. */
-    off_t pos;                          /* Current position. */
-  };
-
 /* A single directory entry. */
 struct dir_entry 
   {
@@ -27,10 +20,9 @@ bool inode_create_dir (block_sector_t sector, size_t length);
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
-dir_create (block_sector_t sector, size_t entry_cnt)
+dir_create (block_sector_t sector, size_t entry_cnt, block_sector_t parent_dir)
 {
-    return inode_create_dir (sector, entry_cnt * sizeof (struct dir_entry));
-  //return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+    return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true, parent_dir);
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -178,6 +170,9 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   e.inode_sector = inode_sector;
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
+  if(success)
+	  ++dir->inode->data.count;
+
  done:
   return success;
 }
@@ -202,7 +197,7 @@ dir_remove (struct dir *dir, const char *name)
 
   /* Open inode. */
   inode = inode_open (e.inode_sector);
-  if (inode == NULL)
+  if (inode == NULL && inode->data.count != 0)
     goto done;
 
   /* Erase directory entry. */
@@ -213,6 +208,7 @@ dir_remove (struct dir *dir, const char *name)
   /* Remove inode. */
   inode_remove (inode);
   success = true;
+  --dir->inode->data.count;
 
  done:
   inode_close (inode);

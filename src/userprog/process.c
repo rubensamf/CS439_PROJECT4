@@ -47,22 +47,24 @@ void getExitStatus(struct exitstatus * es, void * aux);
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+struct pcreate
+{
+	const char* file_name;
+	block_sector_t filedir;
+};
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 	tid_t
-process_execute (const char *file_name) 
+process_execute (const char *file_name, block_sector_t filedir) 
 {
-	char *fn_copy;
 	tid_t tid;
 
-	/* Make a copy of FILE_NAME.
-	   Otherwise there's a race between the caller and load(). */
-	fn_copy = palloc_get_page (0);
-	if (fn_copy == NULL)
-		return TID_ERROR;
-	strlcpy (fn_copy, file_name, PGSIZE);
+	struct pcreate * fn_copy = (struct pcreate *) malloc(sizeof(struct pcreate));
+	fn_copy->file_name = file_name;
+	fn_copy->filedir = filedir;
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -75,13 +77,15 @@ process_execute (const char *file_name)
 
 /* A thread function that loads a user process and starts it running. */
 	static void
-start_process (void *file_name_)
+start_process (void* aux)
 {
-	char *file_name = file_name_;
+	struct pcreate * pcreate = (struct pcreate *) aux;
+	char *file_name = (char *) pcreate->file_name;
 	struct intr_frame if_;
 	bool success;
 
 	thread_current()->fdt = fdt_init();
+	thread_current()->filedir = pcreate->filedir;
 
 	/* Initialize interrupt frame and load executable. */
 	memset (&if_, 0, sizeof if_);
@@ -90,8 +94,8 @@ start_process (void *file_name_)
 	if_.eflags = FLAG_IF | FLAG_MBS;
 	success = load (file_name, &if_.eip, &if_.esp);
 
+	free(pcreate);
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
 	if (!success) 
 	{
 		thread_exit ();

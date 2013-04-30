@@ -36,6 +36,7 @@
 #include "devices/ide.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
+#include "filesys/directory.h"
 #endif
 
 /* Page directory with kernel mappings only. */
@@ -289,7 +290,7 @@ run_task (char **argv)
   
   printf ("Executing '%s':\n", task);
 #ifdef USERPROG
-  process_wait (process_execute (task));
+  process_wait (process_execute (task, ROOT_DIR_SECTOR));
 #else
   run_test (task);
 #endif

@@ -14,20 +14,6 @@
 
 // MULTILEVEL FILE - RDS
 #define MLSIZE 128
-#define INODE_ERROR SIZE_MAX
-
-/* On-disk inode.
-   Must be exactly BLOCK_SECTOR_SIZE bytes long. */
-struct inode_disk
-{
-	off_t pos;		            /* Current Position in Double Indirect Pointer */ 
-	off_t size;                 /* File size in bytes - allocated by number of file sectors. */
-	off_t length;               /* File size in bytes - written. */
-	block_sector_t ptr;	        /* Double Indirect Pointer */
-	bool is_directory;          /* Directory Flag */
-	unsigned magic;             /* Magic number. */
-	uint32_t unused[122];       /* Not used. */
-};
 
 /* Returns the number of sectors to allocate for an inode SIZE
    bytes long. */
@@ -36,17 +22,6 @@ bytes_to_sectors (off_t size)
 {
 	return DIV_ROUND_UP (size, BLOCK_SECTOR_SIZE);
 }
-
-/* In-memory inode. */
-struct inode 
-{
-	struct list_elem elem;              /* Element in inode list. */
-	block_sector_t sector;              /* Sector number of disk location. */
-	int open_cnt;                       /* Number of openers. */
-	bool removed;                       /* True if deleted, false otherwise. */
-	int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-	struct inode_disk data;             /* Inode content. */
-};
 
 // New Functions - RDS
 void inode_release(block_sector_t ptr);
@@ -105,10 +80,6 @@ inode_init (void)
 	list_init (&open_inodes);
 }
 
-        
-        
-        
-        
 /* Initializes an inode with LENGTH bytes of data and
    writes the new inode to sector SECTOR on the file system
    device.
@@ -116,7 +87,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 	bool
-inode_create (block_sector_t sector, off_t length, bool is_directory)
+inode_create (block_sector_t sector, off_t length, bool is_directory, block_sector_t parent_dir)
 {
 	struct inode_disk *disk_inode = NULL;
 	ASSERT (length >= 0);
@@ -131,7 +102,9 @@ inode_create (block_sector_t sector, off_t length, bool is_directory)
 		disk_inode->pos = 0;
 		disk_inode->size = 0;
 		disk_inode->length = length;
-                disk_inode->is_directory = is_directory;
+        disk_inode->is_directory = is_directory;
+		disk_inode->parent_dir = parent_dir;
+		disk_inode->count = 0;
 		disk_inode->magic = INODE_MAGIC;
 
 		if (!free_map_allocate (1, &disk_inode->ptr)) 
@@ -175,18 +148,6 @@ inode_create (block_sector_t sector, off_t length, bool is_directory)
 		}
 	}
 	return true;
-}
-
-        
-/* Initializes an inode for a directory with LENGTH bytes of data and
-   writes the new inode to sector SECTOR on the file system
-   device.
-   Returns true if successful.
-   Returns false if memory or disk allocation fails. */     
-bool
-inode_create_dir (block_sector_t sector, size_t length)
-{
-    return inode_create (sector, length, true);
 }
         
 /* Reads an inode from SECTOR

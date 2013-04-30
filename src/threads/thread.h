@@ -120,6 +120,7 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     struct hash spagedir;				/* Supplementary Page Directory */
     fdt_t fdt;                          /* File Descriptor Table */
+	uint32_t filedir;					/* Block_Sector ID of Current File Directory */
 #endif
 
     /* Owned by thread.c. */

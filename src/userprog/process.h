@@ -2,10 +2,11 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
+#include "devices/block.h"
 
 extern uint8_t * stack_bound; 
 
-tid_t process_execute (const char *file_name);
+tid_t process_execute (const char *file_name, block_sector_t filedir);
 int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
