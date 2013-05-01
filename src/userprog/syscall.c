@@ -16,6 +16,8 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+#include "filesys/directory.h"
+#include "filesys/free-map.h"
 
 #define user_return(val) frame->eax = val; return
 #define MAX_SIZE 256
@@ -41,9 +43,6 @@ static bool check_buffer(const char* uptr, unsigned length);
 static uintptr_t next_value(uintptr_t** sp);
 static char* next_charptr(uintptr_t** sp);
 static void* next_ptr(uintptr_t** sp);
-
-// Locks
-static struct lock exec_lock;
 
 // Syscall Functions
 static void sysclose(int fd);
@@ -103,7 +102,6 @@ syscall_init (void)
 
 	// Initialize Private Locks
 	sema_init(&exec_load_sema, 0);
-	lock_init(&exec_lock);
 
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -527,10 +525,8 @@ syscreate(struct intr_frame* frame, const char* file, unsigned size)
 	static void
 sysexec(struct intr_frame* frame, const char* file)
 {
-	lock_acquire(&exec_lock);
-
 	sema_init(&exec_load_sema, 0);
-	tid_t newpid = process_execute(file);
+	tid_t newpid = process_execute(file, thread_current()->filedir);
 	sema_down(&exec_load_sema);
 
 	if(exec_load_status)
@@ -542,8 +538,6 @@ sysexec(struct intr_frame* frame, const char* file)
 	{
 		user_return( TID_ERROR );
 	}
-
-	lock_release(&exec_lock);
 }
 
 	static void
@@ -654,14 +648,48 @@ syswrite(struct intr_frame *frame, int fd, const void *buffer, unsigned size)
 	static void 
 syschdir(struct intr_frame *frame, const char *dir)
 {
-	// TODO
-	return;
+	struct list* path = parse_filepath((char*) dir);
+	struct dir * directory = navigate_filesys(path, (char*) dir);
+	delete_pathlist(path);
+	if(directory != NULL)
+	{
+		thread_current()->filedir = directory->inode->sector;
+		dir_close(directory);
+		user_return(true);
+	}
+	else
+	{
+		user_return(false);
+	}
 }
 	static void 
 sysmkdir(struct intr_frame *frame, const char *dir)
 {
-	// TODO
-	return;    
+	struct list* path = parse_filepath((char*) dir);
+	struct dir * directory = navigate_filesys(path, (char*) dir);
+	delete_pathlist(path);
+	block_sector_t new_dir;
+	if(directory != NULL && !free_map_allocate (1, &new_dir))
+	{
+		// Add new directory
+		struct list_elem * e = list_back (path);
+		struct path * p = list_entry(e, struct path, elem);
+		if(!dir_create(new_dir, DIRSIZE, directory->inode->sector) && !dir_add(directory, p->path, new_dir))
+		{
+			user_return(false);
+			return;	
+		}
+		else
+		{
+			user_return(true);
+		}
+	}
+	else
+	{
+		user_return(false);
+		return;
+	}
+	dir_close(directory);
 }
 	static void 
 sysreaddir(struct intr_frame *frame UNUSED, int fd UNUSED, char *name UNUSED)
@@ -722,7 +750,7 @@ bool ignore_remove(tid_t id)
 		struct childproc * es = list_entry (e, struct childproc, elem);
 		if(es->childid == id)
 		{
-			list_remove(es);
+			list_remove(e);
 			free(es);
 			return true;
 		}
