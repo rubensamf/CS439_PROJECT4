@@ -148,6 +148,7 @@ struct dir * navigate_filesys(struct list* path, char* filepath)
 	return directory;
 }
 
+/* Parse the filepath into a list */
 struct list* parse_filepath(char* filepath)
 {
 	struct list* path = (struct list*) malloc(sizeof(struct list));
@@ -172,6 +173,7 @@ struct list* parse_filepath(char* filepath)
 	return path;
 }
 
+/* Delete the list containing the entries of the filepath */
 void delete_pathlist(struct list* list)
 {
 	while(!list_empty(list))
