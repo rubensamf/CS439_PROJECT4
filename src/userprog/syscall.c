@@ -670,9 +670,8 @@ sysmkdir(struct intr_frame *frame, const char *dir)
 {
 	struct list* path = parse_filepath((char*) dir);
 	struct dir * directory = navigate_filesys(path, (char*) dir);
-	delete_pathlist(path);
 	block_sector_t new_dir;
-	if(directory != NULL && !free_map_allocate (1, &new_dir))
+	if(directory != NULL && free_map_allocate (1, &new_dir))
 	{
 		// Add new directory
 		struct list_elem * e = list_back (path);
@@ -680,7 +679,6 @@ sysmkdir(struct intr_frame *frame, const char *dir)
 		if(!dir_create(new_dir, DIRSIZE, directory->inode->sector) && !dir_add(directory, p->path, new_dir))
 		{
 			user_return(false);
-			return;	
 		}
 		else
 		{
@@ -690,8 +688,8 @@ sysmkdir(struct intr_frame *frame, const char *dir)
 	else
 	{
 		user_return(false);
-		return;
 	}
+	delete_pathlist(path);
 	dir_close(directory);
 }
 	static void 
