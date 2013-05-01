@@ -33,16 +33,20 @@ bool exec_load_status;
 // GLOBALS
 struct list ignore_list;
 
+// Functions
 static void syscall_handler (struct intr_frame* frame);
 bool exit_remove(tid_t id);
 bool ignore_remove(tid_t id);
 
-// User Memory Check
+// User Memory Checks
 static bool check_uptr(const void* uptr);
 static bool check_buffer(const char* uptr, unsigned length);
 static uintptr_t next_value(uintptr_t** sp);
 static char* next_charptr(uintptr_t** sp);
 static void* next_ptr(uintptr_t** sp);
+
+// Locks
+static struct lock exec_lock;
 
 // Syscall Functions
 static void sysclose(int fd);
@@ -102,6 +106,10 @@ syscall_init (void)
 
 	// Initialize Private Locks
 	sema_init(&exec_load_sema, 0);
+<<<<<<< HEAD
+=======
+	lock_init(&exec_lock);
+>>>>>>> 6197d3338d0969978bcfb48682256714c4ff156f
 
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -139,8 +147,8 @@ syscall_handler (struct intr_frame* frame)
 				sysexit(status);
 			}
 			break;
-		case SYS_EXEC:  
-			{
+		case SYS_EXEC:
+		  	{
 				//pid_t exec (const char *file);
 				const char* file =  next_charptr(&kpaddr_sp);
 				if(file == NULL)
@@ -153,8 +161,8 @@ syscall_handler (struct intr_frame* frame)
 					sysexec(frame, file);
 			}
 			break;
-		case SYS_WAIT:  
-			{
+		case SYS_WAIT:
+		  	{
 				//int wait (pid_t);
 				uintptr_t childid = -1;
 				if(check_uptr(kpaddr_sp))
@@ -165,7 +173,7 @@ syscall_handler (struct intr_frame* frame)
 				user_return( process_wait((tid_t) childid) );
 			}
 			break;
-		case SYS_CREATE:	
+		case SYS_CREATE:
 			{
 				//bool create (const char *file, unsigned initial_size);
 				const char* file =  next_charptr(&kpaddr_sp);
@@ -692,10 +700,9 @@ sysmkdir(struct intr_frame *frame, const char *dir)
 	dir_close(directory);
 }
 	static void 
-sysreaddir(struct intr_frame *frame UNUSED, int fd UNUSED, char *name UNUSED)
+sysreaddir(struct intr_frame *frame, int fd, char *name)
 {
 	// TODO
-	return;    
 }
 	static void 
 sysisdir(struct intr_frame *frame, int fd)
