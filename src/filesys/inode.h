@@ -22,9 +22,10 @@ struct inode_disk
 	bool is_directory;          /* Directory Flag */
 	block_sector_t parent_dir;  /* Inode Pointer of parent directory */
 	off_t count;				/* Number of files in directory */
-
+        
 	unsigned magic;             /* Magic number. */
 	uint32_t unused[120];       /* Not used. */
+	struct lock inode_lock;
 };
 
 /* In-memory inode. */
@@ -52,5 +53,7 @@ off_t inode_write_at (struct inode *, const void *, off_t size, off_t offset);
 void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
+void inode_lock (const struct inode *inode);
+void inode_unlock (const struct inode *inode);
 
 #endif /* filesys/inode.h */
