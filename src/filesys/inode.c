@@ -41,9 +41,6 @@ byte_to_sector (const struct inode *inode, off_t pos)
 		off_t sector = pos / BLOCK_SECTOR_SIZE;
 		off_t dli_pos = sector / MLSIZE;
 		off_t sli_pos = sector % MLSIZE;
-		//printf("pos: %u\n", pos);
-		//printf("dli_pos: %u\n", dli_pos);
-		//printf("sli_pos: %u\n", sli_pos);
 
 		block_sector_t* dli = malloc(MLSIZE * sizeof(block_sector_t));
 		if(dli == NULL)
@@ -105,6 +102,7 @@ inode_create (block_sector_t sector, off_t length, bool is_directory, block_sect
 		disk_inode->is_directory = is_directory;
 		disk_inode->parent_dir = parent_dir;
 		disk_inode->count = 0;
+		disk_inode->wdir = 0;
 		disk_inode->magic = INODE_MAGIC;
 
 		if (!free_map_allocate (1, &disk_inode->ptr)) 
@@ -216,8 +214,6 @@ inode_close (struct inode *inode)
 	if (--inode->open_cnt == 0)
 	{
 		block_write (fs_device, inode->sector, &inode->data);
-		//printf("INODE SIZE: %u\n", inode->data.size);
-		//printf("INODE LENGTH: %u\n", inode->data.length);
 
 		/* Remove from inode list and release lock. */
 		list_remove (&inode->elem);
@@ -354,14 +350,12 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	if (inode->deny_write_cnt)
 		return 0;
 
-	//debug_backtrace();
 	while (size > 0) 
 	{
 		/* Sector to write, starting byte offset within sector. */
 		block_sector_t sector_idx = byte_to_sector (inode, offset);
 		if(sector_idx == INODE_ERROR)
 		{
-			//printf("--------------INODE WRITE: %d:%d:%d--------------\n", inode->data.size, offset, size);
 			if(!inode_extend(inode, offset - inode_length(inode) + size))
 			{
 				return false;
@@ -371,10 +365,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 				sector_idx = byte_to_sector (inode, offset);              
 			}
 		}
-
-
 		int sector_ofs = offset % BLOCK_SECTOR_SIZE;
-		//printf("offset: %d sector_idx: %d\n", offset, sector_idx);
 
 		/* Bytes left in inode, bytes left in sector, lesser of the two. */
 		int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
@@ -428,10 +419,6 @@ bool inode_extend(struct inode *inode, off_t size)
 	off_t length = inode_length (inode);
 	off_t last_sector = length / BLOCK_SECTOR_SIZE;
 	off_t dli_pos = last_sector / MLSIZE;
-
-	//printf("INODE EXTEND\n");
-	//printf("length: %u\n", length);
-	//printf("size: %u\n", size);
 
 	off_t open_space = disk_inode->size - disk_inode->length;
 	if(open_space < size)
@@ -506,13 +493,9 @@ bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* d
 		off_t dli_pos = disk_inode->pos / MLSIZE;
 		bool add = free_map_allocate (1, &dli[dli_pos]);
 		if(add)
-		{
 			block_write (fs_device, dli[dli_pos], sli);	
-		}
 		else
-		{
 			return false;
-		}
 	}
 	block_write (fs_device, disk_inode->ptr, dli);
 	return true;
