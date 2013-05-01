@@ -652,7 +652,7 @@ syswrite(struct intr_frame *frame, int fd, const void *buffer, unsigned size)
 syschdir(struct intr_frame *frame, const char *dir)
 {
 	struct list* path = parse_filepath((char*) dir);
-	struct dir * directory = navigate_filesys(path, (char*) dir);
+	struct dir * directory = navigate_filesys(path, (char*) dir, false);
 	delete_pathlist(path);
 	if(directory != NULL)
 	{
@@ -669,14 +669,14 @@ syschdir(struct intr_frame *frame, const char *dir)
 sysmkdir(struct intr_frame *frame, const char *dir)
 {
 	struct list* path = parse_filepath((char*) dir);
-	struct dir * directory = navigate_filesys(path, (char*) dir);
+	struct dir * directory = navigate_filesys(path, (char*) dir, true);
 	block_sector_t new_dir;
 	if(directory != NULL && free_map_allocate (1, &new_dir))
 	{
 		// Add new directory
 		struct list_elem * e = list_back (path);
 		struct path * p = list_entry(e, struct path, elem);
-		if(!dir_create(new_dir, DIRSIZE, directory->inode->sector) && !dir_add(directory, p->path, new_dir))
+		if(!dir_create(new_dir, DIRSIZE, directory->inode->sector) || !dir_add(directory, p->path, new_dir))
 		{
 			user_return(false);
 		}

@@ -48,16 +48,21 @@ filesys_done (void)
 	bool
 filesys_create (const char *name, off_t initial_size) 
 {
+	struct list * path = parse_filepath((char*) name);
+	struct dir * dir = navigate_filesys(path, (char*) name, true);
+	struct list_elem * e = list_back(path);
+	struct path * p = list_entry(e, struct path, elem);
+
 	block_sector_t inode_sector = 0;
-	struct dir *dir = dir_open_root ();
 	bool success = (dir != NULL
 			&& free_map_allocate (1, &inode_sector)
 			&& inode_create (inode_sector, initial_size, false, INODE_ERROR)
-			&& dir_add (dir, name, inode_sector));
+			&& dir_add (dir, p->path, inode_sector));
 	if (!success && inode_sector != 0) 
 		free_map_release (inode_sector, 1);
 	dir_close (dir);
 
+	delete_pathlist(path);
 	return success;
 }
 
@@ -69,13 +74,17 @@ filesys_create (const char *name, off_t initial_size)
 	struct file *
 filesys_open (const char *name)
 {
-	struct dir *dir = dir_open_root ();
+	struct list * path = parse_filepath((char*) name);
+	struct dir * dir = navigate_filesys(path, (char*) name, true);
+	struct list_elem * e = list_back(path);
+	struct path * p = list_entry(e, struct path, elem);
 	struct inode *inode = NULL;
 
 	if (dir != NULL)
-		dir_lookup (dir, name, &inode);
+		dir_lookup (dir, p->path, &inode);
 	dir_close (dir);
 
+	delete_pathlist(path);
 	return file_open (inode);
 }
 
@@ -86,10 +95,15 @@ filesys_open (const char *name)
 	bool
 filesys_remove (const char *name) 
 {
-	struct dir *dir = dir_open_root ();
+	struct list * path = parse_filepath((char*) name);
+	struct dir * dir = navigate_filesys(path, (char*) name, true);
+	struct list_elem * e = list_back(path);
+	struct path * p = list_entry(e, struct path, elem);
+
 	bool success = dir != NULL && dir_remove (dir, name);
 	dir_close (dir); 
 
+	delete_pathlist(path);
 	return success;
 }
 
@@ -106,7 +120,7 @@ do_format (void)
 }
 
 /* Navigate the filesys to the current directory; otherwise return NULL */
-struct dir * navigate_filesys(struct list* path, char* filepath)
+struct dir * navigate_filesys(struct list* path, char* filepath, bool file)
 {
 	static char check[] = "/";
 	static char cdir[] = ".";
@@ -117,14 +131,30 @@ struct dir * navigate_filesys(struct list* path, char* filepath)
 
 	struct dir * directory = NULL;
 	if(filepath[0] == check[0])
+	{
 		directory = dir_open_root();
+	}
+	else if(thread_current()->filedir == 0)
+	{
+		thread_current()->filedir = ROOT_DIR_SECTOR;
+		directory = dir_open_root();
+	}
 	else
+	{
 		directory = dir_open(inode_open(thread_current()->filedir));
+	}
 
+	size_t length;
 	size_t i;
 	struct inode * inode = NULL;
 	struct list_elem * e = list_begin(path);
-	for(i = 0; i < list_size(path) - 1; ++i)
+
+	if(file)
+		length = list_size(path) - 1;
+	else
+		length = list_size(path);
+
+	for(i = 0; i < length; ++i)
 	{
 		struct path * p = list_entry(e, struct path, elem);
 
@@ -134,7 +164,7 @@ struct dir * navigate_filesys(struct list* path, char* filepath)
 			dir_close(directory);
 			directory = dir_open(inode_open(inode->data.parent_dir));	
 		}
-		else if(dir_lookup(directory, p->path, &inode) && !inode->data.is_directory)
+		else if(dir_lookup(directory, p->path, &inode) && inode->data.is_directory)
 		{
 			dir_close(directory);
 			directory = dir_open(inode);
