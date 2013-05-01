@@ -700,8 +700,58 @@ sysmkdir(struct intr_frame *frame, const char *dir)
 }
 	static void 
 sysreaddir(struct intr_frame *frame, int fd, char *name)
-{
-	// TODO
+{// TODO         
+            /**
+             * System Call: bool readdir (int fd, char *name)
+             * Reads a directory entry from file descriptor fd, 
+             * which must represent a directory. 
+             * If successful, stores the null-terminated file name in name,
+             * which must have room for READDIR_MAX_LEN + 1 bytes,
+             * and returns true. 
+             * If no entries are left in the directory, returns false.
+             * 
+             * "." and ".." should not be returned by readdir.
+             * 
+             * If the directory changes while it is open, 
+             * then it is acceptable for some entries not to be read at all
+             * or to be read multiple times. 
+             * Otherwise, each directory entry should be read once, in any order.
+             * READDIR_MAX_LEN is defined in lib/user/syscall.h. 
+             * If your file system supports longer file names than the basic file system, 
+             * you should increase this value from the default of 14.
+             * 
+             * @param frame     The Frame Pointer
+             * @param fd        The File Descriptor
+             * @param name      The File Name (Null Terminated)
+             */
+            if(!isdir(fd)){
+                user_return(false);
+                return;
+            }                
+            //fd must be a file
+            
+            struct file *file = fd_get_file(fd);
+            // Reads a directory entry from file descriptor fd                        
+            if(file == NULL){
+                user_return(false); //fd_get_file(fd) encountered a problem
+                return;
+            }
+            
+            struct dir *dir = dir_open(file->inode);
+            if(dir == NULL){
+                user_return(false); //dir_open(file->inode) failed
+                return;
+            }
+            
+            bool read_dir_succeed = dir_readdir(dir, name);
+            user_return(read_dir_succeed);
+            while(read_dir_succeed){
+                read_dir_succeed = dir_readdir(dir, name);
+            }
+            //If successful, stores the null-terminated file name in name
+            //If no entries are left in the directory, returns false 
+            
+            //printf("Files: %s\n", name);
 }
 	static void 
 sysisdir(struct intr_frame *frame, int fd)
