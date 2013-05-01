@@ -19,7 +19,7 @@
 #include "filesys/directory.h"
 #include "filesys/free-map.h"
 
-#define user_return(val) frame->eax = val; return
+#define user_return(val) frame->eax = val;
 #define MAX_SIZE 256
 #define CONSOLEWRITE 1
 #define CONSOLEREAD 0
@@ -106,6 +106,8 @@ syscall_init (void)
 
 	// Initialize Private Locks
 	sema_init(&exec_load_sema, 0);
+	lock_init(&exec_lock);
+
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -528,6 +530,8 @@ syscreate(struct intr_frame* frame, const char* file, unsigned size)
 	static void
 sysexec(struct intr_frame* frame, const char* file)
 {
+	lock_acquire(&exec_lock);
+
 	sema_init(&exec_load_sema, 0);
 	tid_t newpid = process_execute(file, thread_current()->filedir);
 	sema_down(&exec_load_sema);
@@ -541,6 +545,8 @@ sysexec(struct intr_frame* frame, const char* file)
 	{
 		user_return( TID_ERROR );
 	}
+
+	lock_release(&exec_lock);
 }
 
 	static void
