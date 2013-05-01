@@ -453,6 +453,7 @@ next_charptr(uintptr_t** sp)
 	void
 sysexit(int status)
 {
+	debug_backtrace();
 	// Print Process Termination Message
 	// File Name	
 	char* name = thread_current()->name;
