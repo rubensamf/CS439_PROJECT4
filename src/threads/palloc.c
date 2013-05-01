@@ -231,7 +231,7 @@ void* frame_eviction(struct frame** framelist, enum palloc_flags flags, void* up
 
 void write_dirty_page(struct frame * f, struct spage * page)
 {
-	static uint32_t * ERROR_ADDR = 0xCCCCCCCC;
+	static uint32_t * ERROR_ADDR = (uint32_t*) 0xCCCCCCCC;
 	lock_release(&fevict);
 	pagedir_clear_page(f->t->pagedir, f->upage); 
 
