@@ -15,9 +15,12 @@
 #include "devices/input.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "filesys/inode.h"
 
 #define user_return(val) frame->eax = val; return
 #define MAX_SIZE 256
+#define CONSOLEWRITE 1
+#define CONSOLEREAD 0
 
 // Extern
 struct list exit_list;
@@ -27,9 +30,6 @@ bool exec_load_status;
 
 // GLOBALS
 struct list ignore_list;
-
-const unsigned CONSOLEWRITE = 1;
-const unsigned CONSOLEREAD = 0;
 
 static void syscall_handler (struct intr_frame* frame);
 bool exit_remove(tid_t id);
@@ -143,8 +143,9 @@ syscall_handler (struct intr_frame* frame)
 				sysexit(status);
 			}
 			break;
-		case SYS_EXEC:  //pid_t exec (const char *file);
+		case SYS_EXEC:  
 			{
+				//pid_t exec (const char *file);
 				const char* file =  next_charptr(&kpaddr_sp);
 				if(file == NULL)
 					sysexit(-1);
@@ -156,20 +157,21 @@ syscall_handler (struct intr_frame* frame)
 					sysexec(frame, file);
 			}
 			break;
-		case SYS_WAIT:  //int wait (pid_t);
+		case SYS_WAIT:  
 			{
+				//int wait (pid_t);
 				uintptr_t childid = -1;
 				if(check_uptr(kpaddr_sp))
 					childid = next_value(&kpaddr_sp);
 				else
 					sysexit(childid);
 
-				int retval = process_wait((tid_t) childid);
-				frame->eax = retval;
+				user_return( process_wait((tid_t) childid) );
 			}
 			break;
-		case SYS_CREATE:	//bool create (const char *file, unsigned initial_size);
+		case SYS_CREATE:	
 			{
+				//bool create (const char *file, unsigned initial_size);
 				const char* file =  next_charptr(&kpaddr_sp);
 				if(file == NULL)
 					sysexit(-1);
@@ -344,18 +346,49 @@ syscall_handler (struct intr_frame* frame)
 		case SYS_CHDIR:          
 			{
 				//bool chdir (const char *dir) 
+				const char* file = next_charptr(&kpaddr_sp);
+				if(file == NULL)
+					sysexit(-1);
 
+				unsigned len = strlen(file);
+				if(!check_buffer(file, len))
+					sysexit(-1);
+				else
+					syschdir(frame, file);
 			}
 			break;        
 		case SYS_MKDIR:   
 			{
 				//bool mkdir (const char *dir) 
+				const char* file = next_charptr(&kpaddr_sp);
+				if(file == NULL)
+					sysexit(-1);
+
+				unsigned len = strlen(file);
+				if(!check_buffer(file, len))
+					sysexit(-1);
+				else
+					sysmkdir(frame, file);
 			}
 			break;                  
 		case SYS_READDIR:
 			{
 				//bool readdir (int fd, char *name) 
+				int fd = 0;
+				if (check_uptr(kpaddr_sp))
+					fd = (int) next_value(&kpaddr_sp);
+				else
+					sysexit(-1);
 
+				const char* file = next_charptr(&kpaddr_sp);
+				if(file == NULL)
+					sysexit(-1);
+
+				unsigned len = strlen(file);
+				if(!check_buffer(file, len))
+					sysexit(-1);
+				else
+					sysreaddir(frame, fd, (char *) file);
 			}
 			break;                
 		case SYS_ISDIR:        
@@ -490,10 +523,7 @@ sysclose(int fd)
 	static void
 syscreate(struct intr_frame* frame, const char* file, unsigned size)
 {
-	lock_acquire(&filecreate_lock);
-	bool result = filesys_create(file, size);
-	frame->eax = result;
-	lock_release(&filecreate_lock);
+	user_return( filesys_create(file, size) );
 }
 
 	static void
@@ -507,12 +537,12 @@ sysexec(struct intr_frame* frame, const char* file)
 
 	if(exec_load_status)
 	{
-		frame->eax = newpid;
+		user_return( newpid );
 		addChildProc(newpid);
 	}
 	else
 	{
-		frame->eax = TID_ERROR;
+		user_return( TID_ERROR );
 	}
 
 	lock_release(&exec_lock);
@@ -579,8 +609,7 @@ sysread(struct intr_frame *frame, int fd, void *buffer, unsigned size)
 	static void 
 sysremove(struct intr_frame* frame, const char* file)
 {
-	bool result = filesys_remove(file);
-	frame->eax = result;
+	user_return( filesys_remove(file) );
 }
 
 	static void
@@ -625,13 +654,13 @@ syswrite(struct intr_frame *frame, int fd, const void *buffer, unsigned size)
 }
 
 	static void 
-syschdir(struct intr_frame *frame UNUSED, const char *dir UNUSED)
+syschdir(struct intr_frame *frame, const char *dir)
 {
 	// TODO
 	return;
 }
 	static void 
-sysmkdir(struct intr_frame *frame UNUSED, const char *dir UNUSED)
+sysmkdir(struct intr_frame *frame, const char *dir)
 {
 	// TODO
 	return;    
@@ -643,19 +672,33 @@ sysreaddir(struct intr_frame *frame UNUSED, int fd UNUSED, char *name UNUSED)
 	return;    
 }
 	static void 
-sysisdir(struct intr_frame *frame UNUSED, int fd UNUSED)
+sysisdir(struct intr_frame *frame, int fd)
 {
-	// TODO
-	return;
+	struct file *file = fd_get_file(fd);
+	if(file == NULL)
+	{
+		user_return(-1);
+	}
+	else
+	{
+		struct inode * inode = file_get_inode(file);
+		user_return( inode->data.is_directory );
+	}
 }
 	static void 
-sysinumber(struct intr_frame *frame UNUSED, int fd UNUSED)
+sysinumber(struct intr_frame *frame, int fd)
 {
-	// TODO
-	return;
+	struct file *file = fd_get_file(fd);
+	if(file == NULL)
+	{
+		user_return(-1);
+	}
+	else
+	{
+		struct inode * inode = file_get_inode(file);
+		user_return( inode_get_inumber(inode) );
+	}
 }
-
-
 
 bool exit_remove(tid_t id)
 {
