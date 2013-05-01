@@ -106,11 +106,6 @@ syscall_init (void)
 
 	// Initialize Private Locks
 	sema_init(&exec_load_sema, 0);
-<<<<<<< HEAD
-=======
-	lock_init(&exec_lock);
->>>>>>> 6197d3338d0969978bcfb48682256714c4ff156f
-
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
