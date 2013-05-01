@@ -80,18 +80,14 @@ inode_init (void)
 	list_init (&open_inodes);
 }
 
-        
-        
-        
-        
 /* Initializes an inode with LENGTH bytes of data and
    writes the new inode to sector SECTOR on the file system
    device.
  * Set Directory flag.
-   Returns true if successful.
-   Returns false if memory or disk allocation fails. */
+ Returns true if successful.
+ Returns false if memory or disk allocation fails. */
 	bool
-inode_create (block_sector_t sector, off_t length, bool is_directory)
+inode_create (block_sector_t sector, off_t length, bool is_directory, block_sector_t parent_dir)
 {
 	struct inode_disk *disk_inode = NULL;
 	ASSERT (length >= 0);
@@ -106,7 +102,9 @@ inode_create (block_sector_t sector, off_t length, bool is_directory)
 		disk_inode->pos = 0;
 		disk_inode->size = 0;
 		disk_inode->length = length;
-                disk_inode->is_directory = is_directory;
+		disk_inode->is_directory = is_directory;
+		disk_inode->parent_dir = parent_dir;
+		disk_inode->count = 0;
 		disk_inode->magic = INODE_MAGIC;
 
 		if (!free_map_allocate (1, &disk_inode->ptr)) 
@@ -152,18 +150,6 @@ inode_create (block_sector_t sector, off_t length, bool is_directory)
 	return true;
 }
 
-        
-/* Initializes an inode for a directory with LENGTH bytes of data and
-   writes the new inode to sector SECTOR on the file system
-   device.
-   Returns true if successful.
-   Returns false if memory or disk allocation fails. */     
-bool
-inode_create_dir (block_sector_t sector, size_t length)
-{
-    return inode_create (sector, length, true);
-}
-        
 /* Reads an inode from SECTOR
    and returns a `struct inode' that contains it.
    Returns a null pointer if memory allocation fails. */

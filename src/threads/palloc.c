@@ -231,6 +231,7 @@ void* frame_eviction(struct frame** framelist, enum palloc_flags flags, void* up
 
 void write_dirty_page(struct frame * f, struct spage * page)
 {
+	static uint32_t * ERROR_ADDR = 0xCCCCCCCC;
 	lock_release(&fevict);
 	pagedir_clear_page(f->t->pagedir, f->upage); 
 
@@ -239,7 +240,7 @@ void write_dirty_page(struct frame * f, struct spage * page)
 
 	// Panic Kernel if no more swap space 
 	ASSERT(page->swapindex != BITMAP_ERROR); 
-	if(f->t->pagedir != 0xcccccccc)
+	if(f->t->pagedir != ERROR_ADDR)
 	{
 		pagedir_set_dirty(f->t->pagedir, f->upage, false);
 		if(!pagedir_set_page(f->t->pagedir, f->upage, f->kpage, page->readonly))

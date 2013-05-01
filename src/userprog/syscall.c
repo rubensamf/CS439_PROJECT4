@@ -44,7 +44,6 @@ static void* next_ptr(uintptr_t** sp);
 
 // Locks
 static struct lock exec_lock;
-static struct lock filecreate_lock;
 
 // Syscall Functions
 static void sysclose(int fd);
@@ -105,7 +104,6 @@ syscall_init (void)
 	// Initialize Private Locks
 	sema_init(&exec_load_sema, 0);
 	lock_init(&exec_lock);
-	lock_init(&filecreate_lock);
 
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
