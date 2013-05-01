@@ -26,12 +26,9 @@ void filesys_done (void);
 bool filesys_create (const char *name, off_t initial_size);
 struct file *filesys_open (const char *name);
 bool filesys_remove (const char *name);
-struct dir * navigate_filesys(struct list* path, char* filepath);
-struct list* parse_filepath(char* filepath);
-void delete_list(struct list* list);
 
 // New Functions
-struct dir * navigate_filesys(struct list* path, char* filepath);
+struct dir * navigate_filesys(struct list* path, char* filepath, bool file);
 struct list* parse_filepath(char* filepath);
 void delete_pathlist(struct list* list);
 
