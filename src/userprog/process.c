@@ -60,11 +60,15 @@ struct pcreate
 	tid_t
 process_execute (const char *file_name, block_sector_t filedir) 
 {
+	char *fn_copy;
 	tid_t tid;
 
-	struct pcreate * fn_copy = (struct pcreate *) malloc(sizeof(struct pcreate));
-	fn_copy->file_name = file_name;
-	fn_copy->filedir = filedir;
+	/* Make a copy of FILE_NAME.
+	   Otherwise there's a race between the caller and load(). */
+	fn_copy = palloc_get_page (0);
+	if (fn_copy == NULL)
+		return TID_ERROR;
+	strlcpy (fn_copy, file_name, PGSIZE);
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -79,13 +83,12 @@ process_execute (const char *file_name, block_sector_t filedir)
 	static void
 start_process (void *aux)
 {
-	struct pcreate * pcreate = (struct pcreate *) aux;
-	char *file_name = (char *) pcreate->file_name;
+	char *file_name = aux;
 	struct intr_frame if_;
 	bool success;
 
 	thread_current()->fdt = fdt_init();
-	thread_current()->filedir = pcreate->filedir;
+	thread_current()->filedir = 1;
 
 	/* Initialize interrupt frame and load executable. */
 	memset (&if_, 0, sizeof if_);
@@ -95,7 +98,7 @@ start_process (void *aux)
 	success = load (file_name, &if_.eip, &if_.esp);
 
 	/* If load failed, quit. */
-	free(pcreate);
+	palloc_free_page (file_name);
 	if (!success) 
 	{
 		thread_exit ();
@@ -541,7 +544,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		p->page_read_bytes = page_read_bytes;
 		p->page_zero_bytes = page_zero_bytes;
 		p->swapindex = BITMAP_ERROR;
-        lock_init(&p->spagelock);
+		lock_init(&p->spagelock);
 		hash_insert (&thread_current()->spagedir, &p->hash_elem);
 
 		/* Advance. */
@@ -581,7 +584,7 @@ setup_stack (void **esp)
 				p->page_read_bytes = 0;
 				p->page_zero_bytes = PGSIZE;
 				p->swapindex = BITMAP_ERROR;
-            	lock_init(&p->spagelock);
+				lock_init(&p->spagelock);
 				hash_insert (&thread_current()->spagedir, &p->hash_elem);
 			}
 		}
