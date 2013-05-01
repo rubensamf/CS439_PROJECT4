@@ -298,6 +298,9 @@ syscall_handler (struct intr_frame* frame)
 				}
 				else
 				{
+					struct inode * inode = file_get_inode(fd_get_file(fd));
+					if(inode->data.is_directory)
+						sysexit(-1);
 					syswrite(frame, fd, file, length);
 				}
 			}
@@ -662,7 +665,12 @@ syschdir(struct intr_frame *frame, const char *dir)
 	delete_pathlist(path);
 	if(directory != NULL)
 	{
+		struct inode * old = inode_open(thread_current()->filedir);
+		++old->data.wdir;
+		inode_close(old);
+
 		thread_current()->filedir = directory->inode->sector;
+		++directory->inode->data.wdir;
 		dir_close(directory);
 		user_return(true);
 	}

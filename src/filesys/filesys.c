@@ -13,7 +13,7 @@
 /* Partition that contains the file system. */
 struct block *fs_device;
 static char emptystr[] = "";
-static char check[] = "/";
+static char rootdir[] = "/";
 static char cdir[] = ".";
 static char prevdir[] = "..";
 
@@ -55,17 +55,29 @@ filesys_create (const char *name, off_t initial_size)
 	char * filename = NULL;
 	struct list * path = parse_filepath((char*) name);
 	struct dir * dir = navigate_filesys(path, (char*) name, true);
-	
-	if(strcmp(name, emptystr) == 0 && dir == NULL)
+
+	if(dir == NULL && strcmp(name, emptystr) == 0)
 	{
 		dir = dir_open(inode_open(thread_current()->filedir));
 		filename = (char*) name;
 	}
-	else
+	else if(dir != NULL)
 	{
 		struct list_elem * e = list_back(path);
 		struct path * p = list_entry(e, struct path, elem);
+		if(strcmp(name, cdir) == 0 && strcmp(name, prevdir) == 0)
+		{
+			if(dir != NULL)
+				dir_close(dir);
+			delete_pathlist(path);
+			return false;
+		}
 		filename = p->path;
+	}
+	else
+	{
+		delete_pathlist(path);
+		return false;
 	}
 
 	block_sector_t inode_sector = 0;
@@ -92,18 +104,45 @@ filesys_open (const char *name)
 	char * filename = NULL;
 	struct list * path = parse_filepath((char*) name);
 	struct dir * dir = navigate_filesys(path, (char*) name, true);
-	
-	if(strcmp(name, emptystr) == 0 && dir == NULL)
+
+	if(dir == NULL && strcmp(name, emptystr) == 0) // Empty No-Name file
 	{
 		dir = dir_open(inode_open(thread_current()->filedir));
 		filename = (char*) name;
 	}
-	else
+	else if(dir == NULL && list_size(path) == 0) // Root Directory
+	{
+		delete_pathlist(path);
+		return file_open(inode_open(ROOT_DIR_SECTOR));
+	}
+	else if(dir != NULL)
 	{
 		struct list_elem * e = list_back(path);
 		struct path * p = list_entry(e, struct path, elem);
-		filename = p->path;
+
+		if(strcmp(p->path, cdir) == 0) 
+		{
+			dir_close (dir);
+			delete_pathlist(path);
+			return file_open(dir->inode);
+		}
+		else if(strcmp(p->path, prevdir) == 0)
+		{
+			dir_close (dir);
+			delete_pathlist(path);
+			return file_open(inode_open(dir->inode->data.parent_dir));
+		}
+		else
+		{
+			filename = p->path;
+		}
 	}
+	else
+	{
+		delete_pathlist(path);
+		return NULL;
+	}
+
 	struct inode *inode = NULL;
 
 	if (dir != NULL)
@@ -124,11 +163,16 @@ filesys_remove (const char *name)
 	char * filename = NULL;
 	struct list * path = parse_filepath((char*) name);
 	struct dir * dir = navigate_filesys(path, (char*) name, true);
-	
+
 	if(strcmp(name, emptystr) == 0 && dir == NULL)
 	{
 		dir = dir_open(inode_open(thread_current()->filedir));
 		filename = (char*) name;
+	}
+	else if(dir == NULL && list_size(path) == 0) // Root Directory
+	{
+		delete_pathlist(path);
+		return false;
 	}
 	else
 	{
@@ -163,7 +207,7 @@ struct dir * navigate_filesys(struct list* path, char* filepath, bool file)
 		return NULL;
 
 	struct dir * directory = NULL;
-	if(filepath[0] == check[0])
+	if(filepath[0] == rootdir[0])
 	{
 		directory = dir_open_root();
 	}

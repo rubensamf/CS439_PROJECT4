@@ -196,7 +196,7 @@ dir_remove (struct dir *dir, const char *name)
 
   /* Open inode. */
   inode = inode_open (e.inode_sector);
-  if (inode == NULL && inode->data.count != 0)
+  if (inode == NULL || inode->data.count != 0 || inode->data.wdir != 0)
     goto done;
 
   /* Erase directory entry. */

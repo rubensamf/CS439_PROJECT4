@@ -22,9 +22,10 @@ struct inode_disk
 	bool is_directory;          /* Directory Flag */
 	block_sector_t parent_dir;  /* Inode Pointer of parent directory */
 	off_t count;				/* Number of files in directory */
+	off_t wdir;					/* Number of places where this directory is the current working directory for a process */
         
 	unsigned magic;             /* Magic number. */
-	uint32_t unused[120];       /* Not used. */
+	uint32_t unused[119];       /* Not used. */
 };
 
 /* In-memory inode. */
