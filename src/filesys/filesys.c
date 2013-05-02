@@ -122,15 +122,17 @@ filesys_open (const char *name)
 
 		if(strcmp(p->path, cdir) == 0) 
 		{
-			dir_close (dir);
 			delete_pathlist(path);
-			return file_open(dir->inode);
+			struct file* f = file_open(dir->inode);
+			dir_close (dir);
+			return f;
 		}
 		else if(strcmp(p->path, prevdir) == 0)
 		{
-			dir_close (dir);
 			delete_pathlist(path);
-			return file_open(inode_open(dir->inode->data.parent_dir));
+			struct file * f = file_open(inode_open(dir->inode->data.parent_dir));
+			dir_close (dir);
+			return f;
 		}
 		else
 		{
@@ -164,15 +166,7 @@ filesys_remove (const char *name)
 	struct list * path = parse_filepath((char*) name);
 	struct dir * dir = navigate_filesys(path, (char*) name, true);
 
-        /*struct list_elem *e;
-        for (e = list_begin (path); e != list_end (path);
-           e = list_next (e))
-        {
-          struct path * p = list_entry(e, struct path, elem);
-          printf("%s\n", p->path);
-        }*/
-        
-	if(strcmp(name, emptystr) == 0 && dir == NULL)
+	if(dir == NULL && strcmp(name, emptystr) == 0)
 	{
 		dir = dir_open(inode_open(thread_current()->filedir));
 		filename = (char*) name;
@@ -189,7 +183,6 @@ filesys_remove (const char *name)
 		filename = p->path;
 	}
 
-        //printf("dir: %s  filename:%s", dir->inode, filename);
 	bool success = dir != NULL && dir_remove (dir, filename);
 	dir_close (dir); 
 
@@ -248,7 +241,7 @@ struct dir * navigate_filesys(struct list* path, char* filepath, bool file)
 		if(strcmp(p->path, prevdir) == 0)
 		{
 			dir_close(directory);
-			directory = dir_open(inode_open(inode->data.parent_dir));	
+			directory = dir_open(inode_open(directory->inode->data.parent_dir));	
 		}
 		else if(dir_lookup(directory, p->path, &inode) && inode->data.is_directory)
 		{

@@ -145,7 +145,7 @@ syscall_handler (struct intr_frame* frame)
 			}
 			break;
 		case SYS_EXEC:
-		  	{
+			{
 				//pid_t exec (const char *file);
 				const char* file =  next_charptr(&kpaddr_sp);
 				if(file == NULL)
@@ -159,7 +159,7 @@ syscall_handler (struct intr_frame* frame)
 			}
 			break;
 		case SYS_WAIT:
-		  	{
+			{
 				//int wait (pid_t);
 				uintptr_t childid = -1;
 				if(check_uptr(kpaddr_sp))
@@ -662,7 +662,6 @@ syschdir(struct intr_frame *frame, const char *dir)
 {
 	struct list* path = parse_filepath((char*) dir);
 	struct dir * directory = navigate_filesys(path, (char*) dir, false);
-	delete_pathlist(path);
 	if(directory != NULL)
 	{
 		struct inode * old = inode_open(thread_current()->filedir);
@@ -674,10 +673,23 @@ syschdir(struct intr_frame *frame, const char *dir)
 		dir_close(directory);
 		user_return(true);
 	}
+	else if(directory == NULL && list_size(path) == 0) // Root Directory
+	{
+		struct inode * old = inode_open(thread_current()->filedir);
+		++old->data.wdir;
+		inode_close(old);
+
+		thread_current()->filedir = ROOT_DIR_SECTOR;
+		directory = dir_open_root();
+		++directory->inode->data.wdir;
+		dir_close(directory);
+		user_return(true);
+	}
 	else
 	{
 		user_return(false);
 	}
+	delete_pathlist(path);
 }
 	static void 
 sysmkdir(struct intr_frame *frame, const char *dir)
@@ -709,45 +721,15 @@ sysmkdir(struct intr_frame *frame, const char *dir)
 	static void 
 sysreaddir(struct intr_frame *frame, int fd, char *name)
 {         
-            /**
-             * System Call: bool readdir (int fd, char *name)
-             * Reads a directory entry from file descriptor fd, 
-             * which must represent a directory. 
-             * If successful, stores the null-terminated file name in name,
-             * which must have room for READDIR_MAX_LEN + 1 bytes,
-             * and returns true. 
-             * If no entries are left in the directory, returns false.
-             * 
-             * "." and ".." should not be returned by readdir.
-             * 
-             * If the directory changes while it is open, 
-             * then it is acceptable for some entries not to be read at all
-             * or to be read multiple times. 
-             * Otherwise, each directory entry should be read once, in any order.
-             * READDIR_MAX_LEN is defined in lib/user/syscall.h. 
-             * If your file system supports longer file names than the basic file system, 
-             * you should increase this value from the default of 14.
-             * 
-             * @param frame     The Frame Pointer
-             * @param fd        The File Descriptor
-             * @param name      The File Name (Null Terminated)
-             */
-            
-            //fd must be a directory
-            struct file *file = fd_get_file(fd);
-            if(file == NULL)
-                    user_return(-1);
-            
-            struct inode * inode = file_get_inode(file);
-            if(inode->data.is_directory)
-                user_return(-1);
-            
-            struct dir *dir = dir_open(inode);
-            if(dir == NULL){
-                user_return(-1);
-            }
-            
-            user_return(dir_readdir(dir, name));           
+	struct file *file = fd_get_file(fd);
+	if(file == NULL)
+		user_return(-1);
+
+	struct inode * inode = file_get_inode(file);
+	if(!inode->data.is_directory)
+		user_return(-1);
+
+	user_return(dir_readdir(file->dir, name));           
 }
 	static void 
 sysisdir(struct intr_frame *frame, int fd)
