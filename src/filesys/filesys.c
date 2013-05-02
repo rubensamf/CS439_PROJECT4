@@ -123,7 +123,7 @@ filesys_open (const char *name)
 		if(strcmp(p->path, cdir) == 0) 
 		{
 			delete_pathlist(path);
-			struct file* f = file_open(dir->inode);
+			struct file* f = file_open(inode_open(dir->inode->sector));
 			dir_close (dir);
 			return f;
 		}

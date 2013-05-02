@@ -24,7 +24,8 @@ bytes_to_sectors (off_t size)
 }
 
 // New Functions - RDS
-void inode_release(block_sector_t ptr);
+void inode_release(block_sector_t* dli);
+void inode_sli_release(block_sector_t* sli);
 bool inode_extend(struct inode *inode, off_t offset);
 bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* dli, block_sector_t* sli);
 
@@ -131,7 +132,7 @@ inode_create (block_sector_t sector, off_t length, bool is_directory, block_sect
 
 		if(!result)
 		{
-			inode_release (disk_inode->ptr);
+			free_map_release(disk_inode->ptr, 1);
 			free (sli);
 			free (dli);
 			free (disk_inode);
@@ -180,7 +181,7 @@ inode_open (block_sector_t sector)
 	inode->open_cnt = 1;
 	inode->deny_write_cnt = 0;
 	inode->removed = false;
-    lock_init(&inode->inode_lock);
+	lock_init(&inode->inode_lock);
 	block_read (fs_device, inode->sector, &inode->data);
 	return inode;
 }
@@ -223,50 +224,50 @@ inode_close (struct inode *inode)
 		{
 			free_map_release (inode->sector, 1);
 			// Replace with function to release every allocated page for inode
-			inode_release (inode->data.ptr);
+			block_sector_t* dli = malloc(MLSIZE * sizeof(block_sector_t));
+			if(dli != NULL)
+			{
+				block_read(fs_device, inode->data.ptr, dli);
+				inode_release (dli);
+			}
 		}
 		free (inode); 
 	}
 }
 
-void inode_release(block_sector_t ptr)
+void inode_release(block_sector_t* dli)
 {
-	block_sector_t* dli = malloc(MLSIZE * sizeof(block_sector_t));
-	if(dli == NULL)
-		return;
-
-	block_read(fs_device, ptr, dli);
-	free_map_release(ptr, 1);
-
 	block_sector_t* sli = malloc(MLSIZE * sizeof(block_sector_t));
-	if(sli == NULL)
-		return;
-
-	unsigned i;
-	unsigned j;
-	for(i = 0; i < MLSIZE; ++i)
+	if(sli != NULL)
 	{
-		if(dli[i] == INODE_ERROR)
+		unsigned i;
+		unsigned j;
+		for(i = 0; i < MLSIZE; ++i)
 		{
-			free(dli);
-			free(sli);
-			return;
-		}
-
-		block_read(fs_device, dli[i], sli);
-		free_map_release(dli[i], 1);
-
-		for(j = 0; j < MLSIZE; ++j)
-		{
-			if(sli[j] == INODE_ERROR)
+			if(dli[i] != INODE_ERROR)
 			{
-				free(dli);
-				free(sli);
-				return;
+				block_read(fs_device, dli[i], sli);
+				free_map_release(dli[i], 1);
+
+				for(j = 0; j < MLSIZE; ++j)
+				{
+					if(sli[j] != INODE_ERROR)
+						free_map_release(sli[j], 1);
+				}
 			}
-			free_map_release(sli[j], 1);
 		}
 	}
+}
+
+void inode_sli_release(block_sector_t* sli)
+{
+	unsigned i;
+	for(i = 0; i < MLSIZE; ++i)
+	{
+		if(sli[i] != INODE_ERROR)
+			free_map_release(sli[i], 1);
+	}
+
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
@@ -468,6 +469,8 @@ bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* d
 		}
 		else
 		{	
+			inode_sli_release(sli);
+			inode_release(dli);
 			return false;
 		}
 
@@ -483,6 +486,8 @@ bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* d
 			}
 			else
 			{
+				inode_sli_release(sli);
+				inode_release(dli);
 				return false;
 			}
 		}
@@ -493,9 +498,15 @@ bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* d
 		off_t dli_pos = disk_inode->pos / MLSIZE;
 		bool add = free_map_allocate (1, &dli[dli_pos]);
 		if(add)
+		{
 			block_write (fs_device, dli[dli_pos], sli);	
+		}
 		else
+		{
+			inode_sli_release(sli);
+			inode_release(dli);
 			return false;
+		}
 	}
 	block_write (fs_device, disk_inode->ptr, dli);
 	return true;

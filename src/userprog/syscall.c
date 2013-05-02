@@ -458,6 +458,7 @@ next_charptr(uintptr_t** sp)
 	void
 sysexit(int status)
 {
+	debug_backtrace();
 	// Print Process Termination Message
 	// File Name	
 	char* name = thread_current()->name;
@@ -723,11 +724,17 @@ sysreaddir(struct intr_frame *frame, int fd, char *name)
 {         
 	struct file *file = fd_get_file(fd);
 	if(file == NULL)
-		user_return(-1);
+	{
+		user_return(false);
+		return;
+	}
 
 	struct inode * inode = file_get_inode(file);
 	if(!inode->data.is_directory)
-		user_return(-1);
+	{
+		user_return(false);
+		return;
+	}
 
 	user_return(dir_readdir(file->dir, name));           
 }
