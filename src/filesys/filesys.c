@@ -240,8 +240,9 @@ struct dir * navigate_filesys(struct list* path, char* filepath, bool file)
 		// Navigate file system
 		if(strcmp(p->path, prevdir) == 0)
 		{
+			block_sector_t parentid = directory->inode->data.parent_dir;
 			dir_close(directory);
-			directory = dir_open(inode_open(directory->inode->data.parent_dir));	
+			directory = dir_open(inode_open(parentid));	
 		}
 		else if(dir_lookup(directory, p->path, &inode) && inode->data.is_directory)
 		{

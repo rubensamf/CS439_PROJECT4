@@ -458,7 +458,6 @@ next_charptr(uintptr_t** sp)
 	void
 sysexit(int status)
 {
-	debug_backtrace();
 	// Print Process Termination Message
 	// File Name	
 	char* name = thread_current()->name;
@@ -666,7 +665,7 @@ syschdir(struct intr_frame *frame, const char *dir)
 	if(directory != NULL)
 	{
 		struct inode * old = inode_open(thread_current()->filedir);
-		++old->data.wdir;
+		--old->data.wdir;
 		inode_close(old);
 
 		thread_current()->filedir = directory->inode->sector;
@@ -677,7 +676,7 @@ syschdir(struct intr_frame *frame, const char *dir)
 	else if(directory == NULL && list_size(path) == 0) // Root Directory
 	{
 		struct inode * old = inode_open(thread_current()->filedir);
-		++old->data.wdir;
+		--old->data.wdir;
 		inode_close(old);
 
 		thread_current()->filedir = ROOT_DIR_SECTOR;
