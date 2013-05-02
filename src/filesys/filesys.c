@@ -164,6 +164,14 @@ filesys_remove (const char *name)
 	struct list * path = parse_filepath((char*) name);
 	struct dir * dir = navigate_filesys(path, (char*) name, true);
 
+        /*struct list_elem *e;
+        for (e = list_begin (path); e != list_end (path);
+           e = list_next (e))
+        {
+          struct path * p = list_entry(e, struct path, elem);
+          printf("%s\n", p->path);
+        }*/
+        
 	if(strcmp(name, emptystr) == 0 && dir == NULL)
 	{
 		dir = dir_open(inode_open(thread_current()->filedir));
@@ -181,6 +189,7 @@ filesys_remove (const char *name)
 		filename = p->path;
 	}
 
+        //printf("dir: %s  filename:%s", dir->inode, filename);
 	bool success = dir != NULL && dir_remove (dir, filename);
 	dir_close (dir); 
 

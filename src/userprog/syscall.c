@@ -708,7 +708,7 @@ sysmkdir(struct intr_frame *frame, const char *dir)
 }
 	static void 
 sysreaddir(struct intr_frame *frame, int fd, char *name)
-{// TODO         
+{         
             /**
              * System Call: bool readdir (int fd, char *name)
              * Reads a directory entry from file descriptor fd, 
@@ -732,34 +732,22 @@ sysreaddir(struct intr_frame *frame, int fd, char *name)
              * @param fd        The File Descriptor
              * @param name      The File Name (Null Terminated)
              */
-            if(!isdir(fd)){
-                user_return(false);
-                return;
-            }                
-            //fd must be a file
             
+            //fd must be a directory
             struct file *file = fd_get_file(fd);
-            // Reads a directory entry from file descriptor fd                        
-            if(file == NULL){
-                user_return(false); //fd_get_file(fd) encountered a problem
-                return;
-            }
+            if(file == NULL)
+                    user_return(-1);
             
-            struct dir *dir = dir_open(file->inode);
+            struct inode * inode = file_get_inode(file);
+            if(inode->data.is_directory)
+                user_return(-1);
+            
+            struct dir *dir = dir_open(inode);
             if(dir == NULL){
-                user_return(false); //dir_open(file->inode) failed
-                return;
+                user_return(-1);
             }
             
-            bool read_dir_succeed = dir_readdir(dir, name);
-            user_return(read_dir_succeed);
-            while(read_dir_succeed){
-                read_dir_succeed = dir_readdir(dir, name);
-            }
-            //If successful, stores the null-terminated file name in name
-            //If no entries are left in the directory, returns false 
-            
-            //printf("Files: %s\n", name);
+            user_return(dir_readdir(dir, name));           
 }
 	static void 
 sysisdir(struct intr_frame *frame, int fd)
