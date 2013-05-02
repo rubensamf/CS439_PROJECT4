@@ -8,6 +8,7 @@
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -416,6 +417,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
 bool inode_extend(struct inode *inode, off_t size)
 {
+	lock_acquire(&inode->inode_lock);
 	struct inode_disk* disk_inode = &inode->data;
 	off_t length = inode_length (inode);
 	off_t last_sector = length / BLOCK_SECTOR_SIZE;
@@ -445,6 +447,7 @@ bool inode_extend(struct inode *inode, off_t size)
 	free (sli);
 	free (dli);
 
+	lock_release(&inode->inode_lock);
 	if(!result)
 	{
 		return false;
