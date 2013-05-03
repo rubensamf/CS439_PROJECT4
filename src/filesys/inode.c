@@ -331,6 +331,10 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 		if (chunk_size <= 0)
 			break;
 
+		// Atomic - Writing and Reading at the end-of-file
+		if(offset >= inode_length(inode))
+			lock_acquire(&inode->data.inode_lock);
+
 		if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
 		{
 			/* Read full sector directly into caller's buffer. */
@@ -349,6 +353,10 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 			block_read (fs_device, sector_idx, bounce);
 			memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
 		}
+
+		// Atomic - Writing and Reading at the end-of-file
+		if(offset >= inode_length(inode))
+			lock_release(&inode->data.inode_lock);
 
 		/* Advance. */
 		size -= chunk_size;
@@ -402,6 +410,10 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 		if (chunk_size <= 0)
 			break;
 
+		// Atomic - Writing and Reading at the end-of-file
+		if(offset >= inode_length(inode))
+			lock_acquire(&inode->data.inode_lock);
+
 		if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
 		{
 			/* Write full sector directly to disk. */
@@ -428,11 +440,16 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 			block_write (fs_device, sector_idx, bounce);
 		}
 
+		// Atomic - Writing and Reading at the end-of-file
+		if(offset >= inode_length(inode))
+			lock_release(&inode->data.inode_lock);
+
 		/* Advance. */
 		size -= chunk_size;
 		offset += chunk_size;
 		bytes_written += chunk_size;
 	}
+
 	if(newlength > inode->data.length && newlength <= inode->data.size)
 		inode->data.length = newlength;
 
@@ -440,6 +457,9 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	return bytes_written;
 }
 
+// Extends the size of the file;
+// Returns true if the file was successfully extended
+// Returns false otherwise 
 bool inode_extend(struct inode *inode, off_t size)
 {
 	lock_acquire(&inode->inode_lock);
@@ -484,6 +504,8 @@ bool inode_extend(struct inode *inode, off_t size)
 	}
 }
 
+// Allocate space to the Inode
+// Returns true if the allocation was successful; Otherwise false
 bool inode_allocate(struct inode_disk* disk_inode, off_t size, block_sector_t* dli, block_sector_t* sli)
 {
 	size_t sectors;
