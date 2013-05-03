@@ -333,7 +333,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 
 		// Atomic - Writing and Reading at the end-of-file
 		if(offset >= inode_length(inode))
-			lock_acquire(&inode->data.inode_lock);
+			lock_acquire(&inode->inode_lock);
 
 		if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
 		{
@@ -356,7 +356,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 
 		// Atomic - Writing and Reading at the end-of-file
 		if(offset >= inode_length(inode))
-			lock_release(&inode->data.inode_lock);
+			lock_release(&inode->inode_lock);
 
 		/* Advance. */
 		size -= chunk_size;
@@ -412,7 +412,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
 		// Atomic - Writing and Reading at the end-of-file
 		if(offset >= inode_length(inode))
-			lock_acquire(&inode->data.inode_lock);
+			lock_acquire(&inode->inode_lock);
 
 		if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
 		{
@@ -442,7 +442,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
 		// Atomic - Writing and Reading at the end-of-file
 		if(offset >= inode_length(inode))
-			lock_release(&inode->data.inode_lock);
+			lock_release(&inode->inode_lock);
 
 		/* Advance. */
 		size -= chunk_size;
