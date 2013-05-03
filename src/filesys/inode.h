@@ -62,7 +62,8 @@ struct inode
 	bool removed;                       /* True if deleted, false otherwise. */
 	int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
 	struct inode_disk data;             /* Inode content. */
-	struct lock inode_lock;				/* Inode Lock for synchronization */
+	struct lock inode_lock;				/* Inode Lock for inode synchronization */
+	struct lock dir_lock;				/* Inode Lock for directory synchronization */
 };
 
 struct bitmap;

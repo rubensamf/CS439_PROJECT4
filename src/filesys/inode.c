@@ -208,6 +208,7 @@ inode_open (block_sector_t sector)
 	inode->deny_write_cnt = 0;
 	inode->removed = false;
 	lock_init(&inode->inode_lock);
+	lock_init(&inode->dir_lock);
 	block_read (fs_device, inode->sector, &inode->data);
 	return inode;
 }

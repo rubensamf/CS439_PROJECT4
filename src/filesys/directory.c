@@ -163,7 +163,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
 {
 	// Actions on Individual Directories are synchronized by acquiring lock on 
 	// directory inode
-	lock_acquire(&dir->inode->inode_lock);
+	lock_acquire(&dir->inode->dir_lock);
 	struct dir_entry e;
 	off_t ofs;
 	bool success = false;
@@ -202,7 +202,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
 
 done:
 	// Release directory inode
-	lock_release(&dir->inode->inode_lock);
+	lock_release(&dir->inode->dir_lock);
 	return success;
 }
 
@@ -214,7 +214,7 @@ dir_remove (struct dir *dir, const char *name)
 {
 	// Actions on Individual Directories are synchronized by acquiring lock on 
 	// directory inode
-	lock_acquire(&dir->inode->inode_lock);
+	lock_acquire(&dir->inode->dir_lock);
 	struct dir_entry e;
 	struct inode *inode = NULL;
 	bool success = false;
@@ -245,7 +245,7 @@ dir_remove (struct dir *dir, const char *name)
 done:
 	inode_close (inode);
 	// Release directory inode
-	lock_release(&dir->inode->inode_lock);
+	lock_release(&dir->inode->dir_lock);
 	return success;
 }
 
