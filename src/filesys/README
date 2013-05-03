@@ -29,3 +29,8 @@ Slip days used: 0
 
 ################
 
+################ Timeout Increase ################
+We have permission from Professor Norman to raise the timeouts for the 
+page-parallel and page-merge-stk tests to 300 seconds.
+tests/vm/page-parallel.output: TIMEOUT = 300
+tests/vm/page-merge-stk.output: TIMEOUT = 300
