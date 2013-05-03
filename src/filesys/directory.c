@@ -161,9 +161,6 @@ dir_lookup (const struct dir *dir, const char *name,
 	bool
 dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
 {
-	// Actions on Individual Directories are synchronized by acquiring lock on 
-	// directory inode
-	lock_acquire(&dir->inode->dir_lock);
 	struct dir_entry e;
 	off_t ofs;
 	bool success = false;
@@ -175,9 +172,16 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
 	if (*name == '\0' || strlen(name) > NAME_MAX)
 		return false;
 
+	// Actions on Individual Directories are synchronized
+	//  by acquiring lock on directory inode
+	lock_acquire(&dir->inode->dir_lock);
+
 	/* Check that NAME is not in use. */
 	if (lookup (dir, name, NULL, NULL))
 		goto done;
+
+	// Release directory inode
+	lock_release(&dir->inode->dir_lock);
 
 	/* Set OFS to offset of free slot.
 	   If there are no free slots, then it will be set to the
@@ -201,8 +205,6 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
 		++dir->inode->data.count;
 
 done:
-	// Release directory inode
-	lock_release(&dir->inode->dir_lock);
 	return success;
 }
 
@@ -212,9 +214,6 @@ done:
 	bool
 dir_remove (struct dir *dir, const char *name) 
 {
-	// Actions on Individual Directories are synchronized by acquiring lock on 
-	// directory inode
-	lock_acquire(&dir->inode->dir_lock);
 	struct dir_entry e;
 	struct inode *inode = NULL;
 	bool success = false;
@@ -223,9 +222,16 @@ dir_remove (struct dir *dir, const char *name)
 	ASSERT (dir != NULL);
 	ASSERT (name != NULL);
 
+	// Actions on Individual Directories are synchronized
+	// by acquiring lock on directory inode
+	lock_acquire(&dir->inode->dir_lock);
+
 	/* Find directory entry. */
 	if (!lookup (dir, name, &e, &ofs))
 		goto done;
+
+	// Release directory inode
+	lock_release(&dir->inode->dir_lock);
 
 	/* Open inode. */
 	inode = inode_open (e.inode_sector);
@@ -244,8 +250,6 @@ dir_remove (struct dir *dir, const char *name)
 
 done:
 	inode_close (inode);
-	// Release directory inode
-	lock_release(&dir->inode->dir_lock);
 	return success;
 }
 
